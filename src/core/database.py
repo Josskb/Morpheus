@@ -141,6 +141,7 @@ class Tweet(Base):
     # Metadata
     is_retweet: Mapped[bool] = mapped_column(Boolean, default=False)
     nlp_processed: Mapped[bool] = mapped_column(Boolean, default=False)
+    alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -153,6 +154,7 @@ class Tweet(Base):
         Index("ix_tweets_tweeted_at", "tweeted_at"),
         Index("ix_tweets_account_id", "account_id"),
         Index("ix_tweets_nlp_processed", "nlp_processed"),
+        Index("ix_tweets_alerted_at", "alerted_at"),
     )
 
     def __repr__(self) -> str:

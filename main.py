@@ -2,13 +2,14 @@
 main.py
 ────────
 Point d'entrée de financial-radar.
-Lance le collecteur + le scheduler de snapshots + le processeur NLP en parallèle.
+Lance collecteur + scheduler + NLP + alertes Telegram en parallèle.
 
 Usage :
   python main.py               # démarre tout
   python main.py --poll-once   # un seul round de polling (test/debug)
   python main.py --init-db     # crée les tables uniquement
-  python main.py --nlp-once    # traite les tweets en attente puis quitter
+  python main.py --nlp-once    # traite les tweets NLP en attente puis quitter
+  python main.py --alert-once  # envoie les alertes en attente puis quitter
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from src.core.database import init_db
 from src.collector.service import CollectorService
 from src.market.snapshot_scheduler import SnapshotScheduler
 from src.nlp.processor import NLPProcessorService
+from src.alerts.service import AlertService
 
 
 async def run_all() -> None:
@@ -38,8 +40,8 @@ async def run_all() -> None:
     scheduler = SnapshotScheduler()
     collector = CollectorService()
     nlp = NLPProcessorService(scheduler=scheduler)
+    alerts = AlertService()
 
-    # Recharge les snapshots manquants depuis la DB au démarrage
     await scheduler.reload_pending_from_db()
 
     try:
@@ -47,6 +49,7 @@ async def run_all() -> None:
             collector.run(),
             scheduler.run(),
             nlp.run(),
+            alerts.run(),
         )
     except KeyboardInterrupt:
         logger.info("Arrêt demandé (Ctrl+C).")
@@ -54,6 +57,7 @@ async def run_all() -> None:
         collector.stop()
         scheduler.stop()
         nlp.stop()
+        await alerts.stop()
         from src.market.fetcher import get_market_fetcher
         await get_market_fetcher().close()
         logger.info("financial-radar arrêté proprement.")
@@ -83,11 +87,22 @@ async def nlp_once() -> None:
     print(f"\nNLP : {count} tweets traités.")
 
 
+async def alert_once() -> None:
+    """Envoie les alertes en attente puis quitte."""
+    await init_db()
+    alerts = AlertService()
+    await alerts._bot.start()
+    count = await alerts.check_and_send()
+    await alerts._bot.stop()
+    print(f"\nAlertes : {count} envoyée(s).")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="financial-radar — Aide à la décision financière")
     parser.add_argument("--poll-once", action="store_true", help="Un seul polling puis quitter")
     parser.add_argument("--init-db", action="store_true", help="Initialiser la DB puis quitter")
     parser.add_argument("--nlp-once", action="store_true", help="Traiter les tweets NLP en attente puis quitter")
+    parser.add_argument("--alert-once", action="store_true", help="Envoyer les alertes en attente puis quitter")
     args = parser.parse_args()
 
     if args.init_db:
@@ -101,6 +116,10 @@ def main() -> None:
 
     if args.nlp_once:
         asyncio.run(nlp_once())
+        sys.exit(0)
+
+    if args.alert_once:
+        asyncio.run(alert_once())
         sys.exit(0)
 
     asyncio.run(run_all())
