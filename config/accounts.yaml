@@ -1,0 +1,68 @@
+# ══════════════════════════════════════════════════════════════════
+#  accounts.yaml — Comptes Twitter/X à surveiller
+#  Ajoute tes comptes ici. Les IDs Twitter sont préférés aux
+#  usernames (plus stables en cas de changement de @).
+# ══════════════════════════════════════════════════════════════════
+
+accounts:
+  # ── Exemple Crypto ─────────────────────────────────────────────
+  - username: WClemente_
+    display_name: "Will Clemente"
+    markets: [crypto]
+    tags: [on-chain, bitcoin]
+    priority: high          # high | medium | low
+    enabled: true
+
+  - username: CryptoCapo_
+    display_name: "Crypto Capo"
+    markets: [crypto]
+    tags: [ta, altcoins]
+    priority: medium
+    enabled: true
+
+  # ── Exemple Stocks ─────────────────────────────────────────────
+  - username: unusualwhales
+    display_name: "Unusual Whales"
+    markets: [stocks, options]
+    tags: [flow, darkpool]
+    priority: high
+    enabled: true
+
+  - username: DeItaone
+    display_name: "Walter Bloomberg"
+    markets: [stocks, macro]
+    tags: [news, macro]
+    priority: high
+    enabled: true
+
+  # ── Template pour ajouter un compte ───────────────────────────
+  # - username: TWITTER_USERNAME       # sans le @
+  #   display_name: "Nom Affiché"
+  #   markets: [crypto]                # crypto | stocks | forex | options
+  #   tags: [ta, macro, news]          # tags libres pour filtrage
+  #   priority: medium                 # high | medium | low
+  #   enabled: true
+
+# ── Paramètres de polling ──────────────────────────────────────
+polling:
+  # Intervalle en secondes entre chaque fetch (free tier : soyez conservateur)
+  interval_seconds: 300      # 5 minutes pour free tier
+  # Pour Basic tier : 60 secondes
+  # Pour Pro tier : utiliser filtered_stream à la place
+
+  # Nombre de tweets à récupérer par compte par fetch
+  tweets_per_account: 5
+
+  # Ne récupérer que les tweets plus récents que X heures au démarrage
+  lookback_hours: 24
+
+# ── Filtres globaux ───────────────────────────────────────────────
+filters:
+  # Ignorer les retweets
+  exclude_retweets: true
+  # Ignorer les réponses (replies)
+  exclude_replies: false
+  # Longueur minimale du tweet (évite les "gm" etc.)
+  min_length: 20
+  # Langues acceptées (ISO 639-1)
+  languages: [en, fr]

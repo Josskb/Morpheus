@@ -1,0 +1,57 @@
+# ══════════════════════════════════════════════════════════════════
+#  markets.yaml — Configuration des marchés et actifs trackés
+# ══════════════════════════════════════════════════════════════════
+
+# ── Crypto ────────────────────────────────────────────────────────
+crypto:
+  exchange: binance          # exchange ccxt principal
+  quote_currency: USDT
+  # Paires à tracker en priorité (détection auto via NLP sinon)
+  watchlist:
+    - BTC/USDT
+    - ETH/USDT
+    - SOL/USDT
+    - BNB/USDT
+    - XRP/USDT
+    - DOGE/USDT
+    - AVAX/USDT
+    - MATIC/USDT
+  timeframes: [1m, 5m, 1h, 4h, 1d]
+
+# ── Stocks ────────────────────────────────────────────────────────
+stocks:
+  # Tickers à pre-charger (les autres sont récupérés à la demande)
+  watchlist:
+    - AAPL
+    - MSFT
+    - NVDA
+    - TSLA
+    - META
+    - GOOGL
+    - AMZN
+    - SPY      # ETF S&P500 pour contexte macro
+    - QQQ      # ETF Nasdaq
+    - VIX      # Volatilité (via ^VIX)
+  timeframes: [5m, 1h, 1d]
+  # Décalage pour les marchés US depuis Paris (UTC+2 en été)
+  market_open_utc: "13:30"   # 9h30 NYSE en UTC
+  market_close_utc: "20:00"  # 16h00 NYSE en UTC
+
+# ── Tracking post-tweet ────────────────────────────────────────────
+# Snapshots de prix à prendre après chaque tweet détecté
+performance_windows:
+  - label: "1h"
+    minutes: 60
+  - label: "4h"
+    minutes: 240
+  - label: "24h"
+    minutes: 1440
+  - label: "7d"
+    minutes: 10080
+
+# ── Seuils de performance ─────────────────────────────────────────
+thresholds:
+  # Variation minimum pour considérer un call comme "réussi"
+  profitable_move_pct: 2.0
+  # Variation pour le considérer comme "très réussi"
+  strong_move_pct: 5.0

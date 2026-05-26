@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  # ── Application principale ─────────────────────────────────────
+  radar:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: financial-radar
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data           # persistance SQLite
+      - ./logs:/app/logs           # logs rotatifs
+      - ./models:/app/models       # modèles ML entraînés
+      - ./config:/app/config:ro    # config en lecture seule
+    ports:
+      - "8000:8000"                # API FastAPI
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── Dashboard React (prod) ─────────────────────────────────────
+  # dashboard:
+  #   build:
+  #     context: ./src/dashboard/frontend
+  #     dockerfile: Dockerfile
+  #   container_name: radar-dashboard
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3000:80"
+  #   depends_on:
+  #     - radar
+
+  # ── PostgreSQL (optionnel, swap SQLite en prod) ────────────────
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: radar-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: radar
+  #     POSTGRES_USER: radar
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+volumes: {}
+  # postgres_data:
