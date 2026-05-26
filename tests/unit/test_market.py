@@ -67,8 +67,8 @@ class TestStockFetcher:
 
     @pytest.mark.asyncio
     async def test_returns_none_on_failure(self):
+        # get_price attrape l'exception en interne et retourne None
         fetcher = StockFetcher()
         with patch.object(StockFetcher, "_fetch_price", side_effect=Exception("network error")):
-            with pytest.raises(Exception):
-                # tenacity re-raise après 3 tentatives
-                await fetcher.get_price("INVALID")
+            price = await fetcher.get_price("INVALID")
+        assert price is None
