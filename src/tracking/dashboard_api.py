@@ -20,7 +20,7 @@ def create_app() -> Flask:
     @app.route("/")
     def dashboard():
         """Render dashboard HTML."""
-        return render_template("dashboard.html")
+        return render_template("dashboard_v2.html")
 
     @app.route("/api/alerts")
     def get_alerts():
