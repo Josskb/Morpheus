@@ -12,6 +12,7 @@ from sqlalchemy import select
 from src.core.database import Account, AsyncSessionLocal, Tweet
 from src.core.settings import get_settings
 from src.ml.hybrid_scorer_v2 import HybridScorerV2
+from src.tracking.trade_tracker import TradeTracker
 from .telegram_bot import TelegramBot
 from .formatter_ml import format_alert_with_ml
 
@@ -37,6 +38,7 @@ class AlertServiceMLHybridV2:
         self._min_hybrid_score = min_hybrid_score
         self._alerted_tweets = set()
         self._scorer = HybridScorerV2(nlp_weight=0.65, ml_weight=0.35)
+        self._tracker = TradeTracker()
 
     async def check_and_send(self) -> dict:
         """
@@ -99,6 +101,21 @@ class AlertServiceMLHybridV2:
 
                 if score_result["is_profitable"]:
                     profitable += 1
+
+                # Log alert to tracker (for dashboard)
+                alert_id = f"alert_{tweet.id}_{int(tweet.created_at.timestamp())}"
+                self._tracker.log_alert(
+                    alert_id=alert_id,
+                    username=account.username,
+                    ticker=tweet.tickers[:20] if tweet.tickers else "UNKNOWN",
+                    nlp_score=score_result["nlp_score"],
+                    ml_score=score_result["ml_score"],
+                    hybrid_score=hybrid_score,
+                    ml_profitable=score_result["is_profitable"],
+                    account_reliability=account.reliability_score or 0.5,
+                    account_win_rate=account.win_rate or 0.5,
+                    message=f"@{account.username} | Score: {hybrid_score:.2f}",
+                )
 
                 if hybrid_score < self._min_hybrid_score:
                     filtered += 1
