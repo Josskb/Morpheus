@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+env/
+.pytest_cache
+.coverage
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project
+.claude
+.env
+.env.local
+data/
+logs/
+models/
+*.db
+*.sqlite
+*.sqlite3
+
+# Tests
+.pytest_cache
+htmlcov/
+coverage.xml
+
+# Temporary
+*.tmp
+*.temp

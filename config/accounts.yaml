@@ -35,6 +35,63 @@ accounts:
     priority: high
     enabled: true
 
+  # ── Crypto Analysts ─────────────────────────────────────────────
+  - username: pentosh1
+    display_name: "Pentosh"
+    markets: [crypto]
+    tags: [ta, bitcoin, cycle]
+    priority: high
+    enabled: true
+
+  - username: CryptoKaleo
+    display_name: "Crypto Kaleo"
+    markets: [crypto]
+    tags: [ta, market-structure]
+    priority: high
+    enabled: true
+
+  - username: TheCryptoDog
+    display_name: "The Crypto Dog"
+    markets: [crypto]
+    tags: [ta, altcoins]
+    priority: medium
+    enabled: true
+
+  - username: trendtraderdog
+    display_name: "Trend Trader Dog"
+    markets: [crypto]
+    tags: [ta, technical]
+    priority: medium
+    enabled: true
+
+  - username: RichardHeartBTC
+    display_name: "Richard Heart"
+    markets: [crypto]
+    tags: [fundamental, macro]
+    priority: medium
+    enabled: true
+
+  - username: APompliano
+    display_name: "Anthony Pompliano"
+    markets: [crypto]
+    tags: [macro, bitcoin]
+    priority: medium
+    enabled: true
+
+  - username: Coinos
+    display_name: "Coinos"
+    markets: [crypto]
+    tags: [ta, ethereum, l2]
+    priority: medium
+    enabled: true
+
+  - username: glassnode
+    display_name: "Glassnode"
+    markets: [crypto]
+    tags: [on-chain, analytics]
+    priority: high
+    enabled: true
+
   # ── Template pour ajouter un compte ───────────────────────────
   # - username: TWITTER_USERNAME       # sans le @
   #   display_name: "Nom Affiché"
@@ -45,10 +102,11 @@ accounts:
 
 # ── Paramètres de polling ──────────────────────────────────────
 polling:
-  # Intervalle en secondes entre chaque fetch (free tier : soyez conservateur)
-  interval_seconds: 300      # 5 minutes pour free tier
-  # Pour Basic tier : 60 secondes
-  # Pour Pro tier : utiliser filtered_stream à la place
+  # Intervalle en secondes entre chaque fetch (free tier : 300 req/day limit)
+  # Avec 8-10 comptes et 30min = ~360 req/day (safe margin)
+  interval_seconds: 1800     # 30 minutes pour free tier avec 8-10 comptes
+  # Pour Basic tier : 600 secondes (10 min)
+  # Pour Pro tier : 300 secondes (5 min) ou filtered_stream
 
   # Nombre de tweets à récupérer par compte par fetch
   tweets_per_account: 5
