@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from src.core.database import Account, AsyncSessionLocal, Tweet
 from src.core.settings import get_settings
-from .bot import TelegramBot
+from .telegram_bot import TelegramBot
 from .formatter_ml import format_alert_with_ml, get_ml_alert_score
 
 _ACTIONABLE_CALLS = {"long", "short"}
