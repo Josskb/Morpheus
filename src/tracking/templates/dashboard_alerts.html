@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Radar - Alert Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0f172a;
+            --secondary: #1e293b;
+            --tertiary: #334155;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-tertiary: #94a3b8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, #0d1117 100%);
+            color: var(--text-primary);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--tertiary);
+            border-radius: 4px;
+        }
+
+        header {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.8) 100%);
+            border-bottom: 1px solid var(--tertiary);
+            padding: 2rem 0;
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-tertiary);
+            font-size: 0.95rem;
+        }
+
+        main {
+            padding: 2rem 0;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, var(--secondary) 0%, rgba(30, 41, 59, 0.5) 100%);
+            border: 1px solid var(--tertiary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .stat-box:hover {
+            border-color: var(--accent-cyan);
+            transform: translateY(-4px);
+        }
+
+        .stat-label {
+            color: var(--text-tertiary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-detail {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .section {
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--tertiary);
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--accent-cyan);
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .alert-card {
+            background: linear-gradient(135deg, var(--secondary) 0%, rgba(30, 41, 59, 0.5) 100%);
+            border-left: 4px solid var(--accent-cyan);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+
+        .alert-card:hover {
+            transform: translateX(4px);
+            border-left-color: var(--accent-blue);
+        }
+
+        .alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .ticker-badge {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .trader-name {
+            color: var(--text-tertiary);
+            font-size: 0.9rem;
+        }
+
+        .score-badge {
+            display: inline-block;
+            padding: 0.6rem 1.2rem;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .score-high {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            color: white;
+        }
+
+        .score-medium {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .score-low {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .sentiment-bar {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin: 1rem 0;
+        }
+
+        .sentiment-label {
+            min-width: 60px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .sentiment-value {
+            flex: 1;
+            height: 24px;
+            background: var(--tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .sentiment-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--danger), var(--warning), var(--success));
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 0.8rem;
+            transition: width 0.3s;
+        }
+
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .score-item {
+            background: var(--tertiary);
+            padding: 0.75rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .score-item-label {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            margin-bottom: 0.5rem;
+        }
+
+        .score-item-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .heatmap-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+        }
+
+        .heatmap-table th,
+        .heatmap-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--tertiary);
+        }
+
+        .heatmap-table th {
+            background: var(--secondary);
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .heatmap-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .heatmap-cold {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .heatmap-warm {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .heatmap-hot {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-tertiary);
+        }
+
+        .chart-container {
+            background: var(--secondary);
+            border: 1px solid var(--tertiary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            height: 300px;
+            position: relative;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            .alert-header {
+                flex-direction: column;
+            }
+
+            .score-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .heatmap-table {
+                font-size: 0.9rem;
+            }
+
+            .heatmap-table th,
+            .heatmap-table td {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>📊 Financial Radar</h1>
+            <p>Real-time market sentiment & trading signals</p>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <!-- Global Stats -->
+            <div class="grid-2">
+                <div class="stat-box">
+                    <div class="stat-label">📢 Total Alerts Today</div>
+                    <div class="stat-value" id="totalAlerts">0</div>
+                    <div class="stat-detail">Last 24 hours</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-label">📈 Avg Sentiment</div>
+                    <div class="stat-value" id="avgSentiment">0.00</div>
+                    <div class="stat-detail">-1.00 (Bearish) to +1.00 (Bullish)</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-label">🎯 Avg Hybrid Score</div>
+                    <div class="stat-value" id="avgScore">0.00</div>
+                    <div class="stat-detail">Confidence level (0-1)</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-label">🔥 Top Ticker</div>
+                    <div class="stat-value" id="topTicker">-</div>
+                    <div class="stat-detail">Most alerts</div>
+                </div>
+            </div>
+
+            <!-- Sentiment Distribution Chart -->
+            <div class="section">
+                <div class="section-title">
+                    <span>📊</span> Sentiment Distribution
+                </div>
+                <div class="chart-container">
+                    <canvas id="sentimentChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="section">
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('alerts')">📢 Latest Alerts</button>
+                    <button class="tab" onclick="switchTab('tickers')">🎯 By Ticker</button>
+                    <button class="tab" onclick="switchTab('traders')">👥 By Trader</button>
+                </div>
+
+                <!-- Latest Alerts Tab -->
+                <div id="alerts" class="tab-content active">
+                    <div id="alertsList"></div>
+                </div>
+
+                <!-- By Ticker Tab -->
+                <div id="tickers" class="tab-content">
+                    <table class="heatmap-table">
+                        <thead>
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Alerts</th>
+                                <th>Avg Sentiment</th>
+                                <th>Avg Score</th>
+                                <th>Signal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tickersTable"></tbody>
+                    </table>
+                </div>
+
+                <!-- By Trader Tab -->
+                <div id="traders" class="tab-content">
+                    <table class="heatmap-table">
+                        <thead>
+                            <tr>
+                                <th>Trader</th>
+                                <th>Alerts</th>
+                                <th>Reliability</th>
+                                <th>Win Rate</th>
+                                <th>Avg Sentiment</th>
+                                <th>Quality</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tradersTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let allAlerts = [];
+
+        async function loadAlerts() {
+            try {
+                const res = await fetch('/api/alerts');
+                const data = await res.json();
+
+                if (data.success) {
+                    allAlerts = data.alerts;
+                    updateStats();
+                    renderAlerts();
+                    renderTickerSummary();
+                    renderTraderSummary();
+                    updateCharts();
+                }
+            } catch (e) {
+                console.error('Error loading alerts:', e);
+            }
+        }
+
+        function updateStats() {
+            const totalAlerts = allAlerts.length;
+            const avgSentiment = allAlerts.length > 0
+                ? (allAlerts.reduce((sum, a) => sum + (a.sentiment || 0), 0) / allAlerts.length).toFixed(2)
+                : 0;
+            const avgScore = allAlerts.length > 0
+                ? (allAlerts.reduce((sum, a) => sum + (a.hybrid_score || 0), 0) / allAlerts.length).toFixed(2)
+                : 0;
+
+            const tickerCounts = {};
+            allAlerts.forEach(a => {
+                const ticker = a.ticker || 'UNKNOWN';
+                tickerCounts[ticker] = (tickerCounts[ticker] || 0) + 1;
+            });
+            const topTicker = Object.keys(tickerCounts).sort((a, b) => tickerCounts[b] - tickerCounts[a])[0] || '-';
+
+            document.getElementById('totalAlerts').textContent = totalAlerts;
+            document.getElementById('avgSentiment').textContent = avgSentiment;
+            document.getElementById('avgScore').textContent = avgScore;
+            document.getElementById('topTicker').textContent = topTicker;
+        }
+
+        function renderAlerts() {
+            const html = allAlerts.map(alert => {
+                const sentiment = alert.sentiment || 0;
+                const sentimentPercent = ((sentiment + 1) / 2 * 100).toFixed(1);
+                const sentimentLabel = sentiment > 0.2 ? 'BULLISH' : sentiment < -0.2 ? 'BEARISH' : 'NEUTRAL';
+                const scoreClass = alert.hybrid_score >= 0.7 ? 'score-high' : alert.hybrid_score >= 0.5 ? 'score-medium' : 'score-low';
+
+                return `
+                    <div class="alert-card">
+                        <div class="alert-header">
+                            <div>
+                                <div class="ticker-badge">${alert.ticker || 'N/A'}</div>
+                                <div class="trader-name">@${alert.username}</div>
+                            </div>
+                            <span class="score-badge ${scoreClass}">${(alert.hybrid_score || 0).toFixed(2)}</span>
+                        </div>
+
+                        <div class="sentiment-bar">
+                            <span class="sentiment-label">${sentimentLabel}</span>
+                            <div class="sentiment-value">
+                                <div class="sentiment-fill" style="width: ${sentimentPercent}%">
+                                    ${sentiment.toFixed(2)}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="score-grid">
+                            <div class="score-item">
+                                <div class="score-item-label">NLP</div>
+                                <div class="score-item-value">${(alert.nlp_score || 0).toFixed(2)}</div>
+                            </div>
+                            <div class="score-item">
+                                <div class="score-item-label">ML</div>
+                                <div class="score-item-value">${(alert.ml_score || 0).toFixed(2)}</div>
+                            </div>
+                            <div class="score-item">
+                                <div class="score-item-label">Reliability</div>
+                                <div class="score-item-value">${(alert.account_reliability * 100 || 0).toFixed(0)}%</div>
+                            </div>
+                            <div class="score-item">
+                                <div class="score-item-label">Win Rate</div>
+                                <div class="score-item-value">${(alert.account_win_rate * 100 || 0).toFixed(0)}%</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('alertsList').innerHTML = html || '<div class="empty-state">No alerts yet</div>';
+        }
+
+        function renderTickerSummary() {
+            const tickerData = {};
+
+            allAlerts.forEach(alert => {
+                const ticker = alert.ticker || 'UNKNOWN';
+                if (!tickerData[ticker]) {
+                    tickerData[ticker] = {
+                        count: 0,
+                        sentiments: [],
+                        scores: []
+                    };
+                }
+                tickerData[ticker].count++;
+                tickerData[ticker].sentiments.push(alert.sentiment || 0);
+                tickerData[ticker].scores.push(alert.hybrid_score || 0);
+            });
+
+            const html = Object.entries(tickerData)
+                .sort((a, b) => b[1].count - a[1].count)
+                .map(([ticker, data]) => {
+                    const avgSentiment = (data.sentiments.reduce((a, b) => a + b, 0) / data.sentiments.length).toFixed(2);
+                    const avgScore = (data.scores.reduce((a, b) => a + b, 0) / data.scores.length).toFixed(2);
+                    const sentiment = parseFloat(avgSentiment);
+                    const signal = sentiment > 0.2 ? '🟢 BUY' : sentiment < -0.2 ? '🔴 SELL' : '🟡 HOLD';
+                    const heatmapClass = sentiment > 0.2 ? 'heatmap-hot' : sentiment < -0.2 ? 'heatmap-cold' : 'heatmap-warm';
+
+                    return `
+                        <tr>
+                            <td><strong>${ticker}</strong></td>
+                            <td>${data.count}</td>
+                            <td>${avgSentiment}</td>
+                            <td>${avgScore}</td>
+                            <td><span class="heatmap-cell ${heatmapClass}">${signal}</span></td>
+                        </tr>
+                    `;
+                }).join('');
+
+            document.getElementById('tickersTable').innerHTML = html || '<tr><td colspan="5" class="empty-state">No data</td></tr>';
+        }
+
+        function renderTraderSummary() {
+            const traderData = {};
+
+            allAlerts.forEach(alert => {
+                const trader = alert.username;
+                if (!traderData[trader]) {
+                    traderData[trader] = {
+                        count: 0,
+                        reliability: alert.account_reliability || 0.5,
+                        winRate: alert.account_win_rate || 0.5,
+                        sentiments: []
+                    };
+                }
+                traderData[trader].count++;
+                traderData[trader].sentiments.push(alert.sentiment || 0);
+            });
+
+            const html = Object.entries(traderData)
+                .sort((a, b) => b[1].winRate - a[1].winRate)
+                .map(([trader, data]) => {
+                    const avgSentiment = (data.sentiments.reduce((a, b) => a + b, 0) / data.sentiments.length).toFixed(2);
+                    const quality = data.winRate >= 0.6 ? '⭐⭐⭐ Excellent' : data.winRate >= 0.55 ? '⭐⭐ Good' : '⭐ Fair';
+                    const heatmapClass = data.winRate >= 0.6 ? 'heatmap-hot' : data.winRate >= 0.55 ? 'heatmap-warm' : 'heatmap-cold';
+
+                    return `
+                        <tr>
+                            <td><strong>@${trader}</strong></td>
+                            <td>${data.count}</td>
+                            <td>${(data.reliability * 100).toFixed(0)}%</td>
+                            <td>${(data.winRate * 100).toFixed(0)}%</td>
+                            <td>${avgSentiment}</td>
+                            <td><span class="heatmap-cell ${heatmapClass}">${quality}</span></td>
+                        </tr>
+                    `;
+                }).join('');
+
+            document.getElementById('tradersTable').innerHTML = html || '<tr><td colspan="6" class="empty-state">No data</td></tr>';
+        }
+
+        function updateCharts() {
+            const sentiments = allAlerts.map(a => a.sentiment || 0).sort();
+            const buckets = { bullish: 0, neutral: 0, bearish: 0 };
+
+            sentiments.forEach(s => {
+                if (s > 0.2) bullish++;
+                else if (s < -0.2) bearish++;
+                else neutral++;
+            });
+
+            const ctx = document.getElementById('sentimentChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Bearish (<-0.2)', 'Neutral', 'Bullish (>0.2)'],
+                    datasets: [{
+                        label: 'Alert Count',
+                        data: [buckets.bearish, buckets.neutral, buckets.bullish],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#cbd5e1' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(51, 65, 85, 0.3)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(51, 65, 85, 0.3)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Load on startup
+        loadAlerts();
+        setInterval(loadAlerts, 30000);
+    </script>
+</body>
+</html>
