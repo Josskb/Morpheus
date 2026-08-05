@@ -7,3 +7,6 @@ ignore = ["E501"]  # certains blocs de commentaires ASCII dépassent volontairem
 
 [lint.isort]
 known-first-party = ["src"]
+
+[lint.per-file-ignores]
+"main.py" = ["E402"]  # setup_logging() doit s'exécuter avant les autres imports

@@ -36,13 +36,13 @@ async def test_db(tmp_path, monkeypatch):
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    import src.collector.service as svc_mod
-    import src.nlp.processor as nlp_mod
-    import src.market.snapshot_scheduler as sched_mod
     import src.alerts.service as alert_mod
-    import src.ml.service as ml_mod
+    import src.collector.service as svc_mod
+    import src.market.snapshot_scheduler as sched_mod
     import src.ml.labeler as ml_labeler_mod
+    import src.ml.service as ml_mod
     import src.ml.trainer as ml_trainer_mod
+    import src.nlp.processor as nlp_mod
 
     monkeypatch.setattr(db_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(svc_mod, "AsyncSessionLocal", TestSession)

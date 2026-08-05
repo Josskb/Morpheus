@@ -14,14 +14,17 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
 
 from src.collector.models import (
-    AccountConfig, AccountsFileConfig, FiltersConfig, PollingConfig, RawTweet,
+    AccountConfig,
+    AccountsFileConfig,
+    FiltersConfig,
+    PollingConfig,
+    RawTweet,
 )
 from src.collector.service import CollectorService
 from src.collector.twitter_client import MockTwitterClient
@@ -29,9 +32,7 @@ from src.core.database import Account, MarketSnapshot, Prediction, Tweet
 from src.market.snapshot_scheduler import SnapshotScheduler
 from src.ml.labeler import OutcomeLabeler
 from src.ml.service import MLScoringService
-from src.nlp.analyzer import TweetAnalyzer
 from src.nlp.processor import NLPProcessorService
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

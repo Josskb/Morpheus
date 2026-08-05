@@ -7,11 +7,11 @@ Mocke les appels yfinance et ccxt pour être hors-ligne.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from src.market.fetcher import MarketDataFetcher, StockFetcher, CryptoFetcher
+from src.market.fetcher import CryptoFetcher, MarketDataFetcher, StockFetcher
 
 
 class TestMarketTypeDetection:

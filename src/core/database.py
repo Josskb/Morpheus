@@ -11,16 +11,24 @@ from datetime import datetime
 from typing import AsyncGenerator
 
 from sqlalchemy import (
-    BigInteger, Boolean, DateTime, Float, ForeignKey,
-    Index, Integer, String, Text, func,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
 )
 from sqlalchemy.ext.asyncio import (
-    AsyncSession, async_sessionmaker, create_async_engine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from .settings import get_settings
-
 
 # ── Engine & Session ──────────────────────────────────────────────────────────
 

@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from src.nlp.ticker_extractor import TickerExtractor
+from src.nlp.analyzer import TweetAnalyzer
 from src.nlp.call_classifier import CallClassifier
 from src.nlp.price_extractor import PriceExtractor
-from src.nlp.analyzer import TweetAnalyzer
-
+from src.nlp.ticker_extractor import TickerExtractor
 
 # ── TickerExtractor ────────────────────────────────────────────────────────────
 

@@ -1,5 +1,6 @@
 from .analyzer import NLPResult, TweetAnalyzer
 
+
 # NLPProcessorService dépend de loguru/sqlalchemy — import lazy pour éviter
 # de casser les tests unitaires qui n'ont pas ces dépendances installées.
 def __getattr__(name: str):

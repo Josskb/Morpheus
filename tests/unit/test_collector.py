@@ -7,21 +7,20 @@ Utilise MockTwitterClient → pas besoin de credentials.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import AsyncMock, patch
 
 import pytest
-import pytest_asyncio
 
-from src.collector.models import (
-    AccountConfig, AccountsFileConfig, FiltersConfig, PollingConfig, RawTweet,
-)
 from src.collector.config_loader import get_enabled_usernames
-from src.collector.twitter_client import MockTwitterClient
+from src.collector.models import (
+    AccountConfig,
+    AccountsFileConfig,
+    FiltersConfig,
+    PollingConfig,
+    RawTweet,
+)
 from src.collector.service import CollectorService
-
+from src.collector.twitter_client import MockTwitterClient
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 

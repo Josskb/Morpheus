@@ -27,13 +27,13 @@ from src.core.logging import setup_logging
 
 setup_logging()
 
-from src.core.database import init_db
-from src.collector.service import CollectorService
-from src.market.snapshot_scheduler import SnapshotScheduler
-from src.nlp.processor import NLPProcessorService
 from src.alerts.service import AlertService
+from src.collector.service import CollectorService
+from src.core.database import init_db
+from src.market.snapshot_scheduler import SnapshotScheduler
 from src.ml.service import MLScoringService
 from src.ml.trainer import ModelTrainer
+from src.nlp.processor import NLPProcessorService
 
 
 async def run_all() -> None:
@@ -77,7 +77,7 @@ async def poll_once() -> None:
     await collector.sync_accounts_to_db()
     results = await collector.poll_once()
     print(f"\n{'='*50}")
-    print(f"Résultats du polling :")
+    print("Résultats du polling :")
     for username, count in results.items():
         print(f"  @{username:30s} → {count:3d} nouveaux tweets")
     total = sum(results.values())

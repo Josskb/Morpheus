@@ -8,11 +8,10 @@ et format structuré JSON en production.
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 from loguru import logger
 
-from .settings import get_settings, LOGS_DIR
+from .settings import LOGS_DIR, get_settings
 
 
 def setup_logging() -> None:

@@ -11,7 +11,6 @@ Basic tier : polling + filtered_stream
 
 from __future__ import annotations
 
-import asyncio
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
 
@@ -21,7 +20,6 @@ from loguru import logger
 
 from ..core.settings import get_settings
 from .models import RawTweet
-
 
 # ── Interface abstraite ────────────────────────────────────────────────────────
 
@@ -179,7 +177,6 @@ class MockTwitterClient(TwitterClientBase):
         max_results: int = 5,
         since: datetime | None = None,
     ) -> list[RawTweet]:
-        import random
 
         tickers = ["BTC", "ETH", "AAPL", "NVDA", "SOL", "TSLA", "SPY"]
         now = datetime.now(tz=timezone.utc)

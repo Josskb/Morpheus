@@ -15,9 +15,9 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.database import AsyncSessionLocal, Account, Tweet
+from ..core.database import Account, AsyncSessionLocal, Tweet
 from ..core.settings import get_settings
-from .config_loader import load_accounts_config, get_enabled_usernames
+from .config_loader import get_enabled_usernames, load_accounts_config
 from .models import AccountsFileConfig, RawTweet
 from .twitter_client import TwitterClientBase, create_twitter_client
 

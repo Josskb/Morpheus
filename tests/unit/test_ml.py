@@ -18,12 +18,17 @@ import pytest
 from sqlalchemy import select
 
 from src.core.database import Account, MarketSnapshot, Prediction, Tweet
-from src.ml.features import build_features, get_primary_snapshot, primary_ticker, to_vector, FEATURE_NAMES
+from src.ml.features import (
+    FEATURE_NAMES,
+    build_features,
+    get_primary_snapshot,
+    primary_ticker,
+    to_vector,
+)
 from src.ml.labeler import OutcomeLabeler, _apply_outcome_to_account
 from src.ml.scorer import HEURISTIC_VERSION, MLScorer
 from src.ml.service import MLScoringService
 from src.ml.trainer import ModelTrainer
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

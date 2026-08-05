@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from types import SimpleNamespace
 
-from src.alerts.formatter import format_alert, _conf_label, _price_fmt
+from src.alerts.formatter import _conf_label, _price_fmt, format_alert
 from src.core.database import Account, Tweet
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

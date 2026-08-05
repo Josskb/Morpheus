@@ -19,11 +19,9 @@ from datetime import datetime, timedelta, timezone
 
 from loguru import logger
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import AsyncSessionLocal, MarketSnapshot, Tweet
-from ..core.settings import get_settings
-from .fetcher import get_market_fetcher, MarketType
+from .fetcher import MarketType, get_market_fetcher
 
 # Fenêtres de tracking en minutes
 WINDOWS: list[tuple[str, int]] = [
@@ -177,7 +175,6 @@ class SnapshotScheduler:
         Évite de perdre le tracking après un redémarrage.
         """
         import json
-        from ..core.database import Tweet
 
         count = 0
         cutoff = datetime.now(tz=timezone.utc) - timedelta(days=8)
