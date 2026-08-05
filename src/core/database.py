@@ -7,8 +7,8 @@ SQLite en dev → swap PostgreSQL en prod via DATABASE_URL.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import AsyncGenerator
+from datetime import datetime, timezone
+from typing import Any, AsyncGenerator
 
 from sqlalchemy import (
     Boolean,
@@ -19,8 +19,10 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    TypeDecorator,
     func,
 )
+from sqlalchemy.engine import Dialect
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -29,6 +31,32 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from .settings import get_settings
+
+
+class AwareDateTime(TypeDecorator):
+    """
+    DateTime qui garantit un aller-retour tz-aware (UTC), même sur SQLite qui
+    ne conserve pas le tzinfo au stockage/à la relecture — sans ça, comparer
+    une valeur relue en DB à un datetime.now(tz=timezone.utc) fraîchement
+    créé lève "can't compare offset-naive and offset-aware datetimes".
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        if value is None:
+            return value
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def process_result_value(self, value: Any, dialect: Dialect) -> datetime | None:
+        if value is None:
+            return value
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
 # ── Engine & Session ──────────────────────────────────────────────────────────
 
@@ -104,10 +132,10 @@ class Account(Base):
     reliability_score: Mapped[float | None] = mapped_column(Float)  # 0-1, ML
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        AwareDateTime(), server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        AwareDateTime(), server_default=func.now(), onupdate=func.now()
     )
 
     tweets: Mapped[list["Tweet"]] = relationship(back_populates="account")
@@ -132,7 +160,7 @@ class Tweet(Base):
     like_count: Mapped[int] = mapped_column(Integer, default=0)
     retweet_count: Mapped[int] = mapped_column(Integer, default=0)
     reply_count: Mapped[int] = mapped_column(Integer, default=0)
-    tweeted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    tweeted_at: Mapped[datetime] = mapped_column(AwareDateTime(), nullable=False)
 
     # Données NLP (remplies par Module 3)
     tickers: Mapped[str | None] = mapped_column(String(500))    # JSON ["BTC","ETH"]
@@ -149,9 +177,9 @@ class Tweet(Base):
     # Metadata
     is_retweet: Mapped[bool] = mapped_column(Boolean, default=False)
     nlp_processed: Mapped[bool] = mapped_column(Boolean, default=False)
-    alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    alerted_at: Mapped[datetime | None] = mapped_column(AwareDateTime())
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        AwareDateTime(), server_default=func.now()
     )
 
     account: Mapped["Account"] = relationship(back_populates="tweets")
@@ -184,7 +212,7 @@ class MarketSnapshot(Base):
     # Prix au moment du tweet (t=0)
     price_at_tweet: Mapped[float | None] = mapped_column(Float)
     volume_at_tweet: Mapped[float | None] = mapped_column(Float)
-    snapshot_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    snapshot_time: Mapped[datetime | None] = mapped_column(AwareDateTime())
 
     # Snapshots futurs (remplis progressivement par le scheduler)
     price_1h: Mapped[float | None] = mapped_column(Float)
@@ -199,7 +227,7 @@ class MarketSnapshot(Base):
     change_7d: Mapped[float | None] = mapped_column(Float)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        AwareDateTime(), server_default=func.now()
     )
 
     tweet: Mapped["Tweet"] = relationship(back_populates="market_snapshots")
@@ -229,7 +257,7 @@ class Prediction(Base):
     evaluation_window: Mapped[str | None] = mapped_column(String(10))  # 1h|4h|24h|7d
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        AwareDateTime(), server_default=func.now()
     )
 
     tweet: Mapped["Tweet"] = relationship(back_populates="predictions")

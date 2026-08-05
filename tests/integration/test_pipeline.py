@@ -597,6 +597,36 @@ class TestFullPipeline:
         assert "BTC" in tickers
 
     @pytest.mark.asyncio
+    async def test_real_scheduler_does_not_raise_on_db_roundtrip_tweet(self, test_db):
+        """
+        Régression : un tweet relu depuis la DB doit rester comparable à un
+        datetime.now(tz=timezone.utc) fraîchement créé dans
+        SnapshotScheduler.schedule_for_tweet (pas de scheduler mocké ici,
+        contrairement aux autres tests de ce fichier — c'est justement ce qui
+        laissait passer le bug offset-naive/offset-aware).
+        """
+        config = make_config(["real_scheduler_trader"])
+        fixed_tweet = make_raw_tweet(
+            text="$BTC breakout confirmed, very bullish, loading up here 🚀",
+            username="real_scheduler_trader", tweet_id="REALSCHED001",
+        )
+        mock_client = AsyncMock(spec=MockTwitterClient)
+        mock_client.get_recent_tweets.return_value = [fixed_tweet]
+
+        svc = CollectorService(client=mock_client, config=config)
+        await svc.sync_accounts_to_db()
+        await svc.poll_once()
+
+        nlp = NLPProcessorService(scheduler=SnapshotScheduler())
+        count = await nlp.process_pending()
+
+        assert count == 1
+        async with test_db() as session:
+            tweet = (await session.execute(select(Tweet))).scalar_one()
+        assert tweet.nlp_processed is True
+        assert tweet.call_type == "long"
+
+    @pytest.mark.asyncio
     async def test_multiple_accounts_all_processed(self, test_db):
         """
         Deux comptes → tweets des deux → tous traités par NLP.
