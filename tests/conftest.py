@@ -40,12 +40,18 @@ async def test_db(tmp_path, monkeypatch):
     import src.nlp.processor as nlp_mod
     import src.market.snapshot_scheduler as sched_mod
     import src.alerts.service as alert_mod
+    import src.ml.service as ml_mod
+    import src.ml.labeler as ml_labeler_mod
+    import src.ml.trainer as ml_trainer_mod
 
     monkeypatch.setattr(db_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(svc_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(nlp_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(sched_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(alert_mod, "AsyncSessionLocal", TestSession)
+    monkeypatch.setattr(ml_mod, "AsyncSessionLocal", TestSession)
+    monkeypatch.setattr(ml_labeler_mod, "AsyncSessionLocal", TestSession)
+    monkeypatch.setattr(ml_trainer_mod, "AsyncSessionLocal", TestSession)
 
     yield TestSession
 

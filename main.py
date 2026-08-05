@@ -10,6 +10,8 @@ Usage :
   python main.py --init-db     # crée les tables uniquement
   python main.py --nlp-once    # traite les tweets NLP en attente puis quitter
   python main.py --alert-once  # envoie les alertes en attente puis quitter
+  python main.py --ml-once     # score les tweets ML en attente puis quitter
+  python main.py --ml-train    # entraîne le modèle XGBoost puis quitter
 """
 
 from __future__ import annotations
@@ -30,6 +32,8 @@ from src.collector.service import CollectorService
 from src.market.snapshot_scheduler import SnapshotScheduler
 from src.nlp.processor import NLPProcessorService
 from src.alerts.service import AlertService
+from src.ml.service import MLScoringService
+from src.ml.trainer import ModelTrainer
 
 
 async def run_all() -> None:
@@ -41,6 +45,7 @@ async def run_all() -> None:
     collector = CollectorService()
     nlp = NLPProcessorService(scheduler=scheduler)
     alerts = AlertService()
+    ml = MLScoringService()
 
     await scheduler.reload_pending_from_db()
 
@@ -50,6 +55,7 @@ async def run_all() -> None:
             scheduler.run(),
             nlp.run(),
             alerts.run(),
+            ml.run(),
         )
     except KeyboardInterrupt:
         logger.info("Arrêt demandé (Ctrl+C).")
@@ -58,6 +64,7 @@ async def run_all() -> None:
         scheduler.stop()
         nlp.stop()
         await alerts.stop()
+        ml.stop()
         from src.market.fetcher import get_market_fetcher
         await get_market_fetcher().close()
         logger.info("financial-radar arrêté proprement.")
@@ -97,12 +104,40 @@ async def alert_once() -> None:
     print(f"\nAlertes : {count} envoyée(s).")
 
 
+async def ml_once() -> None:
+    """Score les tweets ML en attente puis quitte."""
+    await init_db()
+    ml = MLScoringService()
+    count = await ml.score_pending()
+    print(f"\nML : {count} tweet(s) scoré(s).")
+
+
+async def ml_train() -> None:
+    """Entraîne le modèle XGBoost sur les données labellisées puis quitte."""
+    await init_db()
+    trainer = ModelTrainer()
+    result = await trainer.train()
+    if result is None:
+        from src.core.settings import get_settings
+        print(
+            f"\nML : échantillons insuffisants pour l'entraînement "
+            f"(< {get_settings().ml_min_training_samples})."
+        )
+    else:
+        print(
+            f"\nML : modèle {result.version} entraîné sur {result.n_samples} exemples "
+            f"(accuracy={result.train_accuracy:.2%})."
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="financial-radar — Aide à la décision financière")
     parser.add_argument("--poll-once", action="store_true", help="Un seul polling puis quitter")
     parser.add_argument("--init-db", action="store_true", help="Initialiser la DB puis quitter")
     parser.add_argument("--nlp-once", action="store_true", help="Traiter les tweets NLP en attente puis quitter")
     parser.add_argument("--alert-once", action="store_true", help="Envoyer les alertes en attente puis quitter")
+    parser.add_argument("--ml-once", action="store_true", help="Scorer les tweets ML en attente puis quitter")
+    parser.add_argument("--ml-train", action="store_true", help="Entraîner le modèle XGBoost puis quitter")
     args = parser.parse_args()
 
     if args.init_db:
@@ -120,6 +155,14 @@ def main() -> None:
 
     if args.alert_once:
         asyncio.run(alert_once())
+        sys.exit(0)
+
+    if args.ml_once:
+        asyncio.run(ml_once())
+        sys.exit(0)
+
+    if args.ml_train:
+        asyncio.run(ml_train())
         sys.exit(0)
 
     asyncio.run(run_all())

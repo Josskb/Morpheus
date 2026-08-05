@@ -24,10 +24,11 @@ numpy==1.26.4
 # ── NLP (Module 3 — installez quand prêt) ─────────────────────────────────────
 # transformers==4.41.2
 # torch==2.3.0
-# scikit-learn==1.5.0
 
-# ── ML (Module 4 — installez quand prêt) ──────────────────────────────────────
-# xgboost==2.0.3
+# ── ML (Module 4) ──────────────────────────────────────────────────────────────
+scikit-learn==1.5.0
+xgboost==2.0.3
+joblib==1.4.2
 # optuna==3.6.1
 
 # ── Alerts (Module 5) ─────────────────────────────────────────────────────────

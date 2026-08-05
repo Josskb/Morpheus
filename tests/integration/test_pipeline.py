@@ -25,8 +25,10 @@ from src.collector.models import (
 )
 from src.collector.service import CollectorService
 from src.collector.twitter_client import MockTwitterClient
-from src.core.database import Account, MarketSnapshot, Tweet
+from src.core.database import Account, MarketSnapshot, Prediction, Tweet
 from src.market.snapshot_scheduler import SnapshotScheduler
+from src.ml.labeler import OutcomeLabeler
+from src.ml.service import MLScoringService
 from src.nlp.analyzer import TweetAnalyzer
 from src.nlp.processor import NLPProcessorService
 
@@ -622,3 +624,89 @@ class TestFullPipeline:
             processed = res.scalars().all()
 
         assert len(processed) == total
+
+
+# ── Module 4 : ML Scoring ──────────────────────────────────────────────────────
+
+class TestMLModule:
+    """
+    Chaîne complète : tweet enrichi NLP → snapshot marché → scoring ML
+    (repli heuristique, pas de modèle entraîné) → labeling → mise à jour des
+    stats de fiabilité du compte.
+    """
+
+    async def _insert_scored_call(self, session_factory, tweet_id: str = "ML001") -> None:
+        async with session_factory() as session:
+            account = Account(
+                username=f"ml_pipeline_trader_{tweet_id}", markets='["crypto"]', tags="[]",
+                priority="high", enabled=True,
+            )
+            session.add(account)
+            await session.flush()
+
+            tweet = Tweet(
+                tweet_id=tweet_id, account_id=account.id,
+                text="$BTC breakout confirmed, very bullish, loading up here 🚀",
+                tickers='["BTC"]', call_type="long",
+                sentiment=0.7, confidence=0.8, urgency_score=0.4,
+                tweeted_at=datetime.now(tz=timezone.utc), nlp_processed=True,
+            )
+            session.add(tweet)
+            await session.flush()
+
+            session.add(MarketSnapshot(
+                tweet_id=tweet.id, ticker="BTC", market_type="crypto",
+                price_at_tweet=40_000.0,
+            ))
+            await session.commit()
+
+    @pytest.mark.asyncio
+    async def test_full_ml_chain_scores_labels_and_updates_account(self, test_db):
+        await self._insert_scored_call(test_db)
+
+        # Scoring : pas de modèle entraîné → repli heuristique.
+        scored = await MLScoringService().score_pending()
+        assert scored == 1
+
+        async with test_db() as session:
+            tweet = (await session.execute(select(Tweet))).scalar_one()
+            prediction = (await session.execute(select(Prediction))).scalar_one()
+        assert tweet.ml_score is not None
+        assert prediction.actual_profitable is None  # pas encore résolu
+
+        # Le marché bouge, la fenêtre 24h se remplit (simulé, sans passer par
+        # le vrai SnapshotScheduler qui est déjà testé ailleurs).
+        async with test_db() as session:
+            snap = (await session.execute(select(MarketSnapshot))).scalar_one()
+            snap.change_24h = 12.5
+            await session.commit()
+
+        labeled = await OutcomeLabeler().label_pending()
+        assert labeled == 1
+
+        async with test_db() as session:
+            prediction = (await session.execute(select(Prediction))).scalar_one()
+            account = (await session.execute(select(Account))).scalar_one()
+
+        assert prediction.actual_profitable is True
+        assert account.total_calls == 1
+        assert account.win_rate == 1.0
+        assert account.reliability_score == pytest.approx(4 / 7)
+
+    @pytest.mark.asyncio
+    async def test_ml_module_does_not_touch_alerts(self, test_db):
+        """Module 4 reste découplé du Module 5 : aucun impact sur alerted_at."""
+        await self._insert_scored_call(test_db, tweet_id="ML002")
+
+        await MLScoringService().score_pending()
+
+        async with test_db() as session:
+            snap = (await session.execute(select(MarketSnapshot))).scalar_one()
+            snap.change_24h = -5.0
+            await session.commit()
+
+        await OutcomeLabeler().label_pending()
+
+        async with test_db() as session:
+            tweet = (await session.execute(select(Tweet))).scalar_one()
+        assert tweet.alerted_at is None

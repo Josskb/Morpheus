@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     min_confidence_score: float = Field(default=0.65, ge=0.0, le=1.0)
     alert_cooldown_minutes: int = Field(default=5, ge=1)
 
+    # ── ML ────────────────────────────────────────────────────────
+    ml_evaluation_window: Literal["1h", "4h", "24h", "7d"] = "24h"
+    ml_min_training_samples: int = Field(default=50, ge=1)
+    ml_score_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+
     # ── Paths (non-env, calculés) ─────────────────────────────────
     @property
     def accounts_config(self) -> Path:
