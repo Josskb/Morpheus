@@ -1,0 +1,19 @@
+# ── Python ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+data/coverage/
+
+# ── Env / secrets ─────────────────────────────────────────────────
+.env
+
+# ── Runtime data ──────────────────────────────────────────────────
+data/*.db
+data/*.db-journal
+logs/*.log
+models/*.joblib
+
+# ── Claude Code ───────────────────────────────────────────────────
+CLAUDE.local.md
