@@ -12,6 +12,7 @@ Usage :
   python main.py --alert-once  # envoie les alertes en attente puis quitter
   python main.py --ml-once     # score les tweets ML en attente puis quitter
   python main.py --ml-train    # entraîne le modèle XGBoost puis quitter
+  python main.py --poll-stocktwits-once  # un seul polling StockTwits puis quitter
 """
 
 from __future__ import annotations
@@ -28,12 +29,21 @@ from src.core.logging import setup_logging
 setup_logging()
 
 from src.alerts.service import AlertService
+from src.collector.config_loader import load_accounts_config
 from src.collector.service import CollectorService
+from src.collector.stocktwits_client import StockTwitsClient
 from src.core.database import init_db
+from src.core.settings import get_settings
 from src.market.snapshot_scheduler import SnapshotScheduler
 from src.ml.service import MLScoringService
 from src.ml.trainer import ModelTrainer
 from src.nlp.processor import NLPProcessorService
+
+
+def _make_stocktwits_collector() -> CollectorService:
+    """Deuxième CollectorService, source StockTwits (Twitter/Nitter est mort)."""
+    config = load_accounts_config(get_settings().symbols_config)
+    return CollectorService(client=StockTwitsClient(), config=config)
 
 
 async def run_all() -> None:
@@ -43,6 +53,7 @@ async def run_all() -> None:
 
     scheduler = SnapshotScheduler()
     collector = CollectorService()
+    stocktwits = _make_stocktwits_collector()
     nlp = NLPProcessorService(scheduler=scheduler)
     alerts = AlertService()
     ml = MLScoringService()
@@ -52,6 +63,7 @@ async def run_all() -> None:
     try:
         await asyncio.gather(
             collector.run(),
+            stocktwits.run(),
             scheduler.run(),
             nlp.run(),
             alerts.run(),
@@ -61,6 +73,7 @@ async def run_all() -> None:
         logger.info("Arrêt demandé (Ctrl+C).")
     finally:
         collector.stop()
+        stocktwits.stop()
         scheduler.stop()
         nlp.stop()
         await alerts.stop()
@@ -83,6 +96,21 @@ async def poll_once() -> None:
     total = sum(results.values())
     print(f"{'='*50}")
     print(f"  TOTAL : {total} tweets\n")
+
+
+async def poll_stocktwits_once() -> None:
+    """Un seul tour de polling StockTwits pour tester."""
+    await init_db()
+    collector = _make_stocktwits_collector()
+    await collector.sync_accounts_to_db()
+    results = await collector.poll_once()
+    print(f"\n{'='*50}")
+    print("Résultats du polling StockTwits :")
+    for symbol, count in results.items():
+        print(f"  {symbol:30s} → {count:3d} nouveaux messages")
+    total = sum(results.values())
+    print(f"{'='*50}")
+    print(f"  TOTAL : {total} messages\n")
 
 
 async def nlp_once() -> None:
@@ -118,7 +146,6 @@ async def ml_train() -> None:
     trainer = ModelTrainer()
     result = await trainer.train()
     if result is None:
-        from src.core.settings import get_settings
         print(
             f"\nML : échantillons insuffisants pour l'entraînement "
             f"(< {get_settings().ml_min_training_samples})."
@@ -138,6 +165,7 @@ def main() -> None:
     parser.add_argument("--alert-once", action="store_true", help="Envoyer les alertes en attente puis quitter")
     parser.add_argument("--ml-once", action="store_true", help="Scorer les tweets ML en attente puis quitter")
     parser.add_argument("--ml-train", action="store_true", help="Entraîner le modèle XGBoost puis quitter")
+    parser.add_argument("--poll-stocktwits-once", action="store_true", help="Un seul polling StockTwits puis quitter")
     args = parser.parse_args()
 
     if args.init_db:
@@ -147,6 +175,10 @@ def main() -> None:
 
     if args.poll_once:
         asyncio.run(poll_once())
+        sys.exit(0)
+
+    if args.poll_stocktwits_once:
+        asyncio.run(poll_stocktwits_once())
         sys.exit(0)
 
     if args.nlp_once:

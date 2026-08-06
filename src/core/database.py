@@ -20,6 +20,7 @@ from sqlalchemy import (
     String,
     Text,
     TypeDecorator,
+    event,
     func,
 )
 from sqlalchemy.engine import Dialect
@@ -63,14 +64,31 @@ class AwareDateTime(TypeDecorator):
 def _make_engine():
     settings = get_settings()
     kwargs = {}
-    if "sqlite" in settings.database_url:
-        # SQLite ne supporte pas le pool de connexions multithread
-        kwargs["connect_args"] = {"check_same_thread": False}
-    return create_async_engine(
+    is_sqlite = "sqlite" in settings.database_url
+    if is_sqlite:
+        # SQLite ne supporte pas le pool de connexions multithread.
+        # `timeout` fait patienter une connexion sur un verrou plutôt que
+        # d'échouer immédiatement avec "database is locked" (collector +
+        # scheduler + nlp + alerts + ml écrivent en parallèle sur le même
+        # fichier).
+        kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30}
+
+    eng = create_async_engine(
         settings.database_url,
         echo=settings.is_dev,   # log SQL en dev
         **kwargs,
     )
+
+    if is_sqlite:
+        # WAL : les lecteurs ne bloquent plus les écrivains (et vice-versa).
+        @event.listens_for(eng.sync_engine, "connect")
+        def _set_sqlite_pragma(dbapi_connection, _record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.close()
+
+    return eng
 
 
 engine = _make_engine()

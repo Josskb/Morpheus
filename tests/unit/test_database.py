@@ -12,9 +12,34 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 
-from src.core.database import Account, Tweet
+from src.core.database import Account, Tweet, _make_engine
+from src.core.settings import get_settings
+
+
+class TestSQLiteConcurrencyPragmas:
+    """
+    Régression prod : `database is locked` quand collector + scheduler (+ nlp,
+    alerts, ml maintenant) écrivent en parallèle sur le même fichier SQLite.
+    WAL + busy_timeout évitent ça (fix porté depuis la VM de prod).
+    """
+
+    @pytest.mark.asyncio
+    async def test_wal_and_busy_timeout_applied(self, tmp_path, monkeypatch):
+        db_url = f"sqlite+aiosqlite:///{tmp_path}/wal_test.db"
+        monkeypatch.setattr(get_settings(), "database_url", db_url)
+
+        test_engine = _make_engine()
+        try:
+            async with test_engine.connect() as conn:
+                journal_mode = (await conn.execute(text("PRAGMA journal_mode"))).scalar()
+                busy_timeout = (await conn.execute(text("PRAGMA busy_timeout"))).scalar()
+        finally:
+            await test_engine.dispose()
+
+        assert journal_mode == "wal"
+        assert busy_timeout == 30000
 
 
 class TestAwareDateTime:

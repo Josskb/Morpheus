@@ -7,9 +7,12 @@ Utilise MockTwitterClient → pas besoin de credentials.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy import select
 
 from src.collector.config_loader import get_enabled_usernames
 from src.collector.models import (
@@ -20,7 +23,9 @@ from src.collector.models import (
     RawTweet,
 )
 from src.collector.service import CollectorService
+from src.collector.stocktwits_client import StockTwitsClient
 from src.collector.twitter_client import MockTwitterClient
+from src.core.database import Account, Tweet
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +57,9 @@ def make_tweet(
     username: str = "trader_a",
     is_retweet: bool = False,
     lang: str = "en",
+    tickers: list[str] | None = None,
+    sentiment: float | None = None,
+    confidence: float | None = None,
 ) -> RawTweet:
     return RawTweet(
         tweet_id="123456789",
@@ -60,6 +68,9 @@ def make_tweet(
         tweeted_at=datetime.now(tz=timezone.utc),
         lang=lang,
         is_retweet=is_retweet,
+        tickers=tickers or [],
+        sentiment=sentiment,
+        confidence=confidence,
     )
 
 
@@ -128,3 +139,155 @@ class TestCollectorFilters:
         svc = self._make_service(sample_accounts_config)
         en_tweet = make_tweet(lang="en")
         assert svc._should_keep(en_tweet) is True
+
+
+# ── Tests StockTwitsClient ──────────────────────────────────────────────────────
+
+def _stocktwits_payload(messages: list[dict]) -> dict:
+    return {"messages": messages}
+
+
+def _stocktwits_message(
+    msg_id: int = 1,
+    body: str = "Loading up here, looks strong",
+    author: str = "trader_x",
+    symbols: list[str] | None = None,
+    sentiment_label: str | None = "Bullish",
+    created_at: str = "2026-08-06T10:00:00Z",
+    likes: int = 3,
+) -> dict:
+    return {
+        "id": msg_id,
+        "body": body,
+        "created_at": created_at,
+        "user": {"username": author},
+        "symbols": [{"symbol": s} for s in (symbols or ["BTC.X"])],
+        "entities": {"sentiment": {"basic": sentiment_label} if sentiment_label else {}},
+        "likes": {"total": likes},
+    }
+
+
+class TestStockTwitsClient:
+    def _mock_response(self, payload: dict) -> MagicMock:
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = payload
+        return resp
+
+    @pytest.mark.asyncio
+    async def test_parses_messages_into_raw_tweets(self):
+        payload = _stocktwits_payload([_stocktwits_message()])
+        client = StockTwitsClient()
+
+        with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=self._mock_response(payload))):
+            tweets = await client.get_recent_tweets("BTC.X", max_results=10)
+
+        assert len(tweets) == 1
+        tweet = tweets[0]
+        assert tweet.tweet_id == "st_1"
+        assert "trader_x" in tweet.text
+        assert tweet.tickers == ["BTC.X"]
+
+    @pytest.mark.asyncio
+    async def test_maps_bullish_sentiment(self):
+        payload = _stocktwits_payload([_stocktwits_message(sentiment_label="Bullish")])
+        client = StockTwitsClient()
+
+        with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=self._mock_response(payload))):
+            tweets = await client.get_recent_tweets("BTC.X")
+
+        assert tweets[0].sentiment == pytest.approx(0.6)
+        assert tweets[0].confidence == pytest.approx(0.6)
+
+    @pytest.mark.asyncio
+    async def test_maps_bearish_sentiment(self):
+        payload = _stocktwits_payload([_stocktwits_message(sentiment_label="Bearish")])
+        client = StockTwitsClient()
+
+        with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=self._mock_response(payload))):
+            tweets = await client.get_recent_tweets("BTC.X")
+
+        assert tweets[0].sentiment == pytest.approx(-0.6)
+
+    @pytest.mark.asyncio
+    async def test_no_declared_sentiment_leaves_none(self):
+        payload = _stocktwits_payload([_stocktwits_message(sentiment_label=None)])
+        client = StockTwitsClient()
+
+        with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=self._mock_response(payload))):
+            tweets = await client.get_recent_tweets("BTC.X")
+
+        assert tweets[0].sentiment is None
+        assert tweets[0].confidence is None
+
+    @pytest.mark.asyncio
+    async def test_multiple_tickers_on_one_message(self):
+        payload = _stocktwits_payload([_stocktwits_message(symbols=["BTC.X", "ETH.X"])])
+        client = StockTwitsClient()
+
+        with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=self._mock_response(payload))):
+            tweets = await client.get_recent_tweets("BTC.X")
+
+        assert tweets[0].tickers == ["BTC.X", "ETH.X"]
+
+    @pytest.mark.asyncio
+    async def test_network_error_returns_empty_list(self):
+        client = StockTwitsClient()
+        with patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("network error"))):
+            tweets = await client.get_recent_tweets("BTC.X")
+        assert tweets == []
+
+    @pytest.mark.asyncio
+    async def test_resolve_user_id_returns_none(self):
+        client = StockTwitsClient()
+        assert await client.resolve_user_id("BTC.X") is None
+
+
+# ── Tests persistance des hints (tickers/sentiment/confidence) ─────────────────
+
+class TestSaveTweetsPersistsHints:
+    @pytest.mark.asyncio
+    async def test_pre_filled_hints_are_persisted(self, test_db):
+        config = AccountsFileConfig(
+            accounts=[AccountConfig(username="BTC.X", priority="high", enabled=True)],
+        )
+        svc = CollectorService(client=StockTwitsClient(), config=config)
+        await svc.sync_accounts_to_db()
+
+        raw = make_tweet(
+            username="BTC.X", tickers=["BTC.X"], sentiment=0.6, confidence=0.6,
+        )
+
+        async with test_db() as session:
+            account = (await session.execute(select(Account).where(Account.username == "BTC.X"))).scalar_one()
+            await svc._save_tweets(session, [raw], account.id)
+            await session.commit()
+
+        async with test_db() as session:
+            tweet = (await session.execute(select(Tweet).where(Tweet.tweet_id == raw.tweet_id))).scalar_one()
+
+        assert json.loads(tweet.tickers) == ["BTC.X"]
+        assert tweet.sentiment == pytest.approx(0.6)
+        assert tweet.confidence == pytest.approx(0.6)
+
+    @pytest.mark.asyncio
+    async def test_no_hints_leaves_fields_none_for_nlp(self, test_db):
+        config = AccountsFileConfig(
+            accounts=[AccountConfig(username="trader_a", priority="high", enabled=True)],
+        )
+        svc = CollectorService(client=MockTwitterClient(), config=config)
+        await svc.sync_accounts_to_db()
+
+        raw = make_tweet(username="trader_a")  # pas de tickers/sentiment/confidence
+
+        async with test_db() as session:
+            account = (await session.execute(select(Account).where(Account.username == "trader_a"))).scalar_one()
+            await svc._save_tweets(session, [raw], account.id)
+            await session.commit()
+
+        async with test_db() as session:
+            tweet = (await session.execute(select(Tweet).where(Tweet.tweet_id == raw.tweet_id))).scalar_one()
+
+        assert tweet.tickers is None
+        assert tweet.sentiment is None
+        assert tweet.confidence is None

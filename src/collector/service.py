@@ -121,6 +121,11 @@ class CollectorService:
                 reply_count=raw.reply_count,
                 tweeted_at=raw.tweeted_at,
                 is_retweet=raw.is_retweet,
+                # Certaines sources (StockTwits) fournissent déjà ces champs —
+                # le NLP les respectera au lieu de les recalculer (voir processor.py).
+                tickers=json.dumps(raw.tickers) if raw.tickers else None,
+                sentiment=raw.sentiment,
+                confidence=raw.confidence,
             ))
             inserted += 1
 

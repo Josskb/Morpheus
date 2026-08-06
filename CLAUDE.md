@@ -19,9 +19,18 @@ The project is built module-by-module (see README for the list). Each module liv
 ## Known repo state
 
 - **`.claude/worktrees/nlp-module` (branch `worktree-nlp-module`) is stray, unmerged exploration** — an earlier messy attempt at ML scoring (duplicated v1/v2 files) that drifted into a partial Module 6 dashboard. Don't treat it as a reference or a starting point without checking with the user first.
-- No `.gitignore` exists yet — `__pycache__/*.pyc` files are currently tracked in git. Don't `git add -A` blindly; stage files explicitly.
-- No CI, no linter/formatter config (no ruff/black/eslint). Don't assume a `lint` or `format` command exists.
-- Known pre-existing bug (unrelated to any specific module): `SnapshotScheduler`/NLP processing can throw `can't compare offset-naive and offset-aware datetimes` because SQLite doesn't round-trip `tzinfo` on `Tweet.tweeted_at`. Not yet fixed.
+- `.gitignore` exists (`__pycache__`, `.env`, `data/*.db`, `logs/*.log`, `models/*.joblib`, `CLAUDE.local.md`). `ruff.toml` configures lint (E/F/W/I) — a `PostToolUse`/`Write|Edit` hook in `.claude/settings.json` runs `ruff check --fix` automatically on every `.py` file edited.
+- `DateTime(timezone=True)` columns don't round-trip `tzinfo` on SQLite — use `AwareDateTime` (`src/core/database.py`) for any new datetime column, never the raw SQLAlchemy type. `_make_engine()` also sets `PRAGMA journal_mode=WAL` + `busy_timeout=30000` (needed once more than one service writes concurrently — collector, scheduler, nlp, alerts, ml all do).
+
+### There is a real production deployment, separate from this repo's history
+
+A Proxmox VM on the user's home LAN (`ssh ubuntu@192.168.1.67`, hostname `VM101`) runs the **actual live bot** — real Telegram alerts, a Flask dashboard on port 5000, Postgres in Docker. Its `~/Morpheus` git checkout is on `main`, **28 commits ahead of `origin/main`, never pushed, and unrelated to this local repo's commit history** (this repo's Modules 1-5 were rebuilt from scratch against `MockTwitterClient` without knowing the VM existed). The VM's commits contain real production learnings: Twitter/Nitter died, replaced with a **StockTwits** collector (ported into this repo 2026-08-06 — `src/collector/stocktwits_client.py`, `config/symbols.yaml`), account reliability ranking, Telegram digest formatting, a short-seller report collector, plus a messy uncommitted "Phase 2 hybrid ML" experimental layer (not ported — this repo's `src/ml/` covers the same need more cleanly).
+
+**Before building anything collector/alerts/ML-related, check whether the VM already solved it** — SSH in and read the code first rather than re-deriving from scratch. Don't touch the VM's running processes or deploy to it without the user explicitly asking for that as a separate step.
+
+**Known issue (2026-08-06, unresolved):** StockTwits' public API returns 403 Forbidden on every symbol — confirmed both locally and from the VM itself, and the VM's live logs show it's been silently failing (no crash, just zero messages collected) since at least that morning. Likely new bot detection on StockTwits' side. Check current status before assuming the StockTwits collector works.
+
+**Keep this file (and the VM's own `~/Morpheus/CLAUDE.md`) up to date as a standing habit** — when something notable happens (a bug found, a decision made, an architecture note worth knowing next session), write it here. Same for the VM's CLAUDE.md when the finding is specific to production/that deployment.
 
 ## Testing
 

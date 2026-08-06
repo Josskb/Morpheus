@@ -26,6 +26,13 @@ class RawTweet(BaseModel):
     reply_count: int = 0
     is_retweet: bool = False
 
+    # Renseignés directement par certaines sources (ex: StockTwits) —
+    # évite de repasser par l'extraction lexicale du NLP quand la source
+    # fournit déjà un signal plus fiable (sentiment déclaré par l'auteur).
+    tickers: list[str] = Field(default_factory=list)
+    sentiment: Optional[float] = None    # -1.0 à 1.0, si fourni par la source
+    confidence: Optional[float] = None   # 0 à 1, si fourni par la source
+
     class Config:
         frozen = True  # immutable après création
 

@@ -69,6 +69,10 @@ class Settings(BaseSettings):
         return CONFIG_DIR / "accounts.yaml"
 
     @property
+    def symbols_config(self) -> Path:
+        return CONFIG_DIR / "symbols.yaml"
+
+    @property
     def markets_config(self) -> Path:
         return CONFIG_DIR / "markets.yaml"
 

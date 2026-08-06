@@ -55,19 +55,29 @@ class NLPProcessorService:
                 try:
                     nlp = self._analyzer.analyze(tweet.text)
 
-                    tweet.tickers = json.dumps(nlp.tickers) if nlp.tickers else None
+                    # Certaines sources (StockTwits) fournissent déjà tickers/
+                    # sentiment/confidence à l'insertion (voir collector/service.py) —
+                    # plus fiable qu'une ré-estimation lexicale, on les respecte.
+                    if tweet.tickers:
+                        tickers = json.loads(tweet.tickers)
+                    else:
+                        tickers = nlp.tickers
+                    sentiment = tweet.sentiment if tweet.sentiment is not None else nlp.sentiment
+                    confidence = tweet.confidence if tweet.confidence is not None else nlp.confidence
+
+                    tweet.tickers = json.dumps(tickers) if tickers else None
                     tweet.call_type = nlp.call_type
-                    tweet.sentiment = nlp.sentiment
-                    tweet.confidence = nlp.confidence
+                    tweet.sentiment = sentiment
+                    tweet.confidence = confidence
                     tweet.target_price = nlp.target_price
                     tweet.stop_loss = nlp.stop_loss
                     tweet.urgency_score = nlp.urgency_score
                     tweet.nlp_processed = True
 
-                    if nlp.tickers and self._scheduler:
+                    if tickers and self._scheduler:
                         await self._scheduler.schedule_for_tweet(
                             tweet_db_id=tweet.id,
-                            tickers=nlp.tickers,
+                            tickers=tickers,
                             tweeted_at=tweet.tweeted_at,
                         )
 
@@ -75,9 +85,9 @@ class NLPProcessorService:
                         "NLP tweet={} → {} sent={:+.2f} conf={:.2f} tickers={}",
                         tweet.tweet_id,
                         nlp.call_type,
-                        nlp.sentiment,
-                        nlp.confidence,
-                        nlp.tickers or "[]",
+                        sentiment,
+                        confidence,
+                        tickers or "[]",
                     )
                     processed += 1
 

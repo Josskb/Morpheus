@@ -447,6 +447,70 @@ class TestNLPModule:
 
         mock_scheduler.schedule_for_tweet.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_nlp_respects_pre_filled_hints_from_source(self, test_db):
+        """
+        Un tweet dont tickers/sentiment/confidence sont déjà remplis par la
+        source (StockTwits) ne doit pas se faire écraser ces champs par une
+        ré-estimation lexicale — mais call_type/target_price/etc. sont quand
+        même calculés normalement.
+        """
+        async with test_db() as session:
+            account = Account(
+                username="BTC.X", markets='["crypto"]', tags='[]',
+                priority="high", enabled=True,
+            )
+            session.add(account)
+            await session.flush()
+
+            tweet = Tweet(
+                tweet_id="ST001",
+                account_id=account.id,
+                text="(@trader_x) loading up here, looks strong",
+                tickers=json.dumps(["BTC.X"]),
+                sentiment=0.6,
+                confidence=0.6,
+                tweeted_at=datetime.now(tz=timezone.utc),
+                nlp_processed=False,
+            )
+            session.add(tweet)
+            await session.commit()
+
+        mock_scheduler = AsyncMock(spec=SnapshotScheduler)
+        nlp = NLPProcessorService(scheduler=mock_scheduler)
+        count = await nlp.process_pending()
+        assert count == 1
+
+        async with test_db() as session:
+            result = await session.execute(select(Tweet).where(Tweet.tweet_id == "ST001"))
+            tweet = result.scalar_one()
+
+        # Hints respectés, pas recalculés lexicalement.
+        assert json.loads(tweet.tickers) == ["BTC.X"]
+        assert tweet.sentiment == pytest.approx(0.6)
+        assert tweet.confidence == pytest.approx(0.6)
+        # Le reste du pipeline NLP tourne quand même normalement.
+        assert tweet.call_type is not None
+        assert tweet.nlp_processed is True
+        mock_scheduler.schedule_for_tweet.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_nlp_fills_hints_when_source_did_not_provide_them(self, test_db):
+        """Sans hints de la source (Mock/Twitter classique), le comportement lexical habituel s'applique."""
+        await self._insert_tweet(
+            test_db, "$BTC bullish setup, accumulating more 🚀", tweet_id="TW001",
+        )
+
+        nlp = NLPProcessorService(scheduler=None)
+        await nlp.process_pending()
+
+        async with test_db() as session:
+            result = await session.execute(select(Tweet).where(Tweet.tweet_id == "TW001"))
+            tweet = result.scalar_one()
+
+        assert "BTC" in json.loads(tweet.tickers)
+        assert tweet.sentiment is not None
+
 
 # ── Module 2 : Market Fetcher ─────────────────────────────────────────────────
 
