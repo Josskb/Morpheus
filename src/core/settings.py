@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     min_confidence_score: float = Field(default=0.65, ge=0.0, le=1.0)
     alert_cooldown_minutes: int = Field(default=5, ge=1)
 
+    # ── Récap Telegram ────────────────────────────────────────────
+    digest_interval_minutes: int = Field(default=30, ge=5)
+    daily_recap_hour_utc: int = Field(default=6, ge=0, le=23)
+    alert_recap_interval_hours: int = Field(default=2, ge=1)
+
     # ── ML ────────────────────────────────────────────────────────
     ml_evaluation_window: Literal["1h", "4h", "24h", "7d"] = "24h"
     ml_min_training_samples: int = Field(default=50, ge=1)

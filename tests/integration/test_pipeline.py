@@ -13,12 +13,13 @@ La DB est une SQLite temporaire créée par la fixture `test_db`.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy import select
 
+from src.alerts.recap_service import RecapService
 from src.collector.models import (
     AccountConfig,
     AccountsFileConfig,
@@ -804,4 +805,60 @@ class TestMLModule:
 
         async with test_db() as session:
             tweet = (await session.execute(select(Tweet))).scalar_one()
+        assert tweet.alerted_at is None
+
+
+# ── Module Récap Telegram ──────────────────────────────────────────────────────
+
+class TestRecapModule:
+    """Récap groupé : signaux forts par compte/ticker + digest des signaux faibles."""
+
+    async def _insert_signal(self, session_factory, tweet_id: str, username: str, sentiment: float) -> None:
+        async with session_factory() as session:
+            account = Account(
+                username=username, markets='["crypto"]', tags="[]",
+                priority="medium", enabled=True,
+            )
+            session.add(account)
+            await session.flush()
+
+            session.add(Tweet(
+                tweet_id=tweet_id, account_id=account.id, text=f"signal {username}",
+                sentiment=sentiment, nlp_processed=True, tickers='["BTC"]',
+                tweeted_at=datetime.now(tz=timezone.utc),
+            ))
+            await session.commit()
+
+    @pytest.mark.asyncio
+    async def test_strong_and_weak_signals_go_to_different_recaps(self, test_db):
+        """Un signal fort part dans le récap par compte, un faible dans le digest — pas les deux."""
+        await self._insert_signal(test_db, "R1", "strong_trader", sentiment=0.9)
+        await self._insert_signal(test_db, "R2", "weak_trader", sentiment=0.1)
+
+        mock_bot = AsyncMock()
+        recap = RecapService(bot=mock_bot, check_interval_seconds=60)
+        recap._last_alert_recap_at = datetime.now(tz=timezone.utc) - timedelta(hours=3)
+        recap._last_digest_at = datetime.now(tz=timezone.utc) - timedelta(minutes=45)
+
+        await recap._send_alert_recap_if_due()
+        await recap._send_digest_if_due()
+
+        strong_rows = mock_bot.send_recap_by_account.call_args[0][0]
+        weak_rows = mock_bot.send_digest.call_args[0][0]
+
+        assert {r[0] for r in strong_rows} == {"strong_trader"}
+        assert {r[0] for r in weak_rows} == {"weak_trader"}
+
+    @pytest.mark.asyncio
+    async def test_recap_does_not_touch_alerted_at(self, test_db):
+        """Module récap reste découplé d'AlertService : n'écrit jamais alerted_at."""
+        await self._insert_signal(test_db, "R3", "strong_trader", sentiment=0.9)
+
+        mock_bot = AsyncMock()
+        recap = RecapService(bot=mock_bot, check_interval_seconds=60)
+        recap._last_alert_recap_at = datetime.now(tz=timezone.utc) - timedelta(hours=3)
+        await recap._send_alert_recap_if_due()
+
+        async with test_db() as session:
+            tweet = (await session.execute(select(Tweet).where(Tweet.tweet_id == "R3"))).scalar_one()
         assert tweet.alerted_at is None

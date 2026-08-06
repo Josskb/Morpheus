@@ -28,6 +28,7 @@ from src.core.logging import setup_logging
 
 setup_logging()
 
+from src.alerts.recap_service import RecapService
 from src.alerts.service import AlertService
 from src.collector.config_loader import load_accounts_config
 from src.collector.service import CollectorService
@@ -56,6 +57,7 @@ async def run_all() -> None:
     stocktwits = _make_stocktwits_collector()
     nlp = NLPProcessorService(scheduler=scheduler)
     alerts = AlertService()
+    recap = RecapService()
     ml = MLScoringService()
 
     await scheduler.reload_pending_from_db()
@@ -67,6 +69,7 @@ async def run_all() -> None:
             scheduler.run(),
             nlp.run(),
             alerts.run(),
+            recap.run(),
             ml.run(),
         )
     except KeyboardInterrupt:
@@ -77,6 +80,7 @@ async def run_all() -> None:
         scheduler.stop()
         nlp.stop()
         await alerts.stop()
+        await recap.stop()
         ml.stop()
         from src.market.fetcher import get_market_fetcher
         await get_market_fetcher().close()
@@ -132,6 +136,18 @@ async def alert_once() -> None:
     print(f"\nAlertes : {count} envoyée(s).")
 
 
+async def recap_once() -> None:
+    """Déclenche les 3 récaps (s'ils sont dus) puis quitte."""
+    await init_db()
+    recap = RecapService()
+    await recap._bot.start()
+    await recap._send_alert_recap_if_due()
+    await recap._send_digest_if_due()
+    await recap._send_daily_recap_if_due()
+    await recap._bot.stop()
+    print("\nRécap : vérification terminée (voir logs pour le détail).")
+
+
 async def ml_once() -> None:
     """Score les tweets ML en attente puis quitte."""
     await init_db()
@@ -163,6 +179,7 @@ def main() -> None:
     parser.add_argument("--init-db", action="store_true", help="Initialiser la DB puis quitter")
     parser.add_argument("--nlp-once", action="store_true", help="Traiter les tweets NLP en attente puis quitter")
     parser.add_argument("--alert-once", action="store_true", help="Envoyer les alertes en attente puis quitter")
+    parser.add_argument("--recap-once", action="store_true", help="Déclencher les récaps dus puis quitter")
     parser.add_argument("--ml-once", action="store_true", help="Scorer les tweets ML en attente puis quitter")
     parser.add_argument("--ml-train", action="store_true", help="Entraîner le modèle XGBoost puis quitter")
     parser.add_argument("--poll-stocktwits-once", action="store_true", help="Un seul polling StockTwits puis quitter")
@@ -187,6 +204,10 @@ def main() -> None:
 
     if args.alert_once:
         asyncio.run(alert_once())
+        sys.exit(0)
+
+    if args.recap_once:
+        asyncio.run(recap_once())
         sys.exit(0)
 
     if args.ml_once:

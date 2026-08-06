@@ -36,6 +36,7 @@ async def test_db(tmp_path, monkeypatch):
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    import src.alerts.recap_service as recap_mod
     import src.alerts.service as alert_mod
     import src.collector.service as svc_mod
     import src.market.snapshot_scheduler as sched_mod
@@ -49,6 +50,7 @@ async def test_db(tmp_path, monkeypatch):
     monkeypatch.setattr(nlp_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(sched_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(alert_mod, "AsyncSessionLocal", TestSession)
+    monkeypatch.setattr(recap_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(ml_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(ml_labeler_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(ml_trainer_mod, "AsyncSessionLocal", TestSession)

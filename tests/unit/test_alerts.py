@@ -390,3 +390,130 @@ class TestAlertService:
             result = await session.execute(select(Tweet).where(Tweet.tweet_id == "FAIL001"))
             t = result.scalar_one()
         assert t.alerted_at is not None  # marqué pour ne pas respammer
+
+
+# ── TelegramBot — récap (portés depuis la VM) ──────────────────────────────────
+
+class TestTradingViewUrl:
+    def test_crypto_suffix(self):
+        from src.alerts.bot import _tradingview_url
+        assert _tradingview_url("BTC.X") == "https://www.tradingview.com/symbols/BTCUSD/"
+
+    def test_plain_us_ticker(self):
+        from src.alerts.bot import _tradingview_url
+        assert _tradingview_url("AAPL") == "https://www.tradingview.com/symbols/AAPL/"
+
+    def test_international_ticker_returns_none(self):
+        from src.alerts.bot import _tradingview_url
+        assert _tradingview_url("000660.KS") is None
+        assert _tradingview_url("ALKAL.PA") is None
+
+
+class TestTelegramBotRecap:
+    def _make_bot(self):
+        from src.alerts.bot import TelegramBot
+        bot = TelegramBot.__new__(TelegramBot)
+        bot._configured = False
+        bot._bot = None
+        bot.send = AsyncMock(return_value=True)
+        return bot
+
+    @pytest.mark.asyncio
+    async def test_send_digest_empty_rows_no_send(self):
+        bot = self._make_bot()
+        result = await bot.send_digest([])
+        assert result is False
+        bot.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_digest_groups_by_username(self):
+        bot = self._make_bot()
+        rows = [
+            ("trader_a", "BTC looking good here", 0.1),
+            ("trader_a", "still watching BTC", 0.02),
+            ("trader_b", "not sure about ETH", -0.03),
+        ]
+        await bot.send_digest(rows)
+        text = bot.send.call_args[0][0]
+        assert "@trader_a" in text
+        assert "@trader_b" in text
+        assert text.count("@trader_a") == 1  # groupé, pas répété
+
+    @pytest.mark.asyncio
+    async def test_send_digest_truncates_and_escapes(self):
+        bot = self._make_bot()
+        long_text = "x" * 300
+        await bot.send_digest([("trader_a", f"<script>{long_text}", 0.0)])
+        text = bot.send.call_args[0][0]
+        assert "&lt;script&gt;" in text
+        assert "…" in text
+
+    @pytest.mark.asyncio
+    async def test_send_recap_by_account_empty_no_send(self):
+        bot = self._make_bot()
+        assert await bot.send_recap_by_account([], 2) is False
+        bot.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_recap_by_account_star_for_reliable(self):
+        bot = self._make_bot()
+        rows = [
+            ("reliable_trader", "BTC breakout", 0.8, 0.75),
+            ("shaky_trader", "ETH breakdown", -0.7, 0.3),
+        ]
+        await bot.send_recap_by_account(rows, 2)
+        text = bot.send.call_args[0][0]
+        assert "@reliable_trader</b> ⭐" in text
+        assert "@shaky_trader</b> ⭐" not in text
+        assert "2h" in text
+
+    @pytest.mark.asyncio
+    async def test_send_recap_by_ticker_empty_no_send(self):
+        bot = self._make_bot()
+        assert await bot.send_recap_by_ticker([], 2) is False
+        bot.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_recap_by_ticker_splits_crypto_and_stocks(self):
+        bot = self._make_bot()
+        rows = [("BTC.X", 5, 0.6), ("AAPL", 3, -0.2)]
+        await bot.send_recap_by_ticker(rows, 2)
+        text = bot.send.call_args[0][0]
+        assert "Bourse" in text
+        assert "Crypto" in text
+        assert "AAPL" in text
+        assert "BTC.X" in text
+
+    @pytest.mark.asyncio
+    async def test_send_recap_by_ticker_links_for_tradeable_tickers(self):
+        bot = self._make_bot()
+        rows = [("BTC.X", 1, 0.5)]
+        await bot.send_recap_by_ticker(rows, 2)
+        text = bot.send.call_args[0][0]
+        assert 'href="https://www.tradingview.com/symbols/BTCUSD/"' in text
+
+    @pytest.mark.asyncio
+    async def test_send_recap_by_ticker_no_link_for_international(self):
+        bot = self._make_bot()
+        rows = [("000660.KS", 1, 0.5)]
+        await bot.send_recap_by_ticker(rows, 2)
+        text = bot.send.call_args[0][0]
+        assert "<a href" not in text
+        assert "000660.KS" in text
+
+    @pytest.mark.asyncio
+    async def test_send_daily_recap_empty_no_send(self):
+        bot = self._make_bot()
+        assert await bot.send_daily_recap([]) is False
+        bot.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_daily_recap_formats_mentions(self):
+        bot = self._make_bot()
+        rows = [("BTC.X", 12, 0.4), ("000660.KS", 3, -0.1)]
+        await bot.send_daily_recap(rows)
+        text = bot.send.call_args[0][0]
+        assert "12 mentions" in text
+        assert "3 mentions" in text
+        assert 'href="https://www.tradingview.com/symbols/BTCUSD/"' in text
+        assert "000660.KS</b> — 3 mentions" in text  # pas de lien, pas de crash
