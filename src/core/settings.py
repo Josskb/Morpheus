@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     ml_min_training_samples: int = Field(default=50, ge=1)
     ml_score_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
 
+    # ── Tendance ApeWisdom ──────────────────────────────────────────
+    trending_min_mentions: int = Field(default=10, ge=1)
+    trending_spike_multiplier: float = Field(default=3.0, ge=1.0)
+    trending_alert_cooldown_hours: int = Field(default=6, ge=1)
+
     # ── Paths (non-env, calculés) ─────────────────────────────────
     @property
     def accounts_config(self) -> Path:

@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy import select
 
+from src.collector.apewisdom_client import ApeWisdomClient
 from src.collector.config_loader import get_enabled_usernames
 from src.collector.models import (
     AccountConfig,
@@ -360,3 +361,55 @@ class TestYFinanceNewsClient:
     async def test_resolve_user_id_returns_none(self):
         client = YFinanceNewsClient()
         assert await client.resolve_user_id("AAPL") is None
+
+
+# ── Tests ApeWisdomClient ────────────────────────────────────────────────────
+
+def _apewisdom_response(results: list[dict]) -> dict:
+    return {"count": len(results), "pages": 1, "current_page": 1, "results": results}
+
+
+class TestApeWisdomClient:
+    def _mock_response(self, payload: dict) -> MagicMock:
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = payload
+        return resp
+
+    @pytest.mark.asyncio
+    async def test_parses_trending_results(self):
+        payload = _apewisdom_response([
+            {"rank": 1, "ticker": "BTC.X", "name": "Bitcoin", "mentions": 136,
+             "upvotes": 890, "rank_24h_ago": 1, "mentions_24h_ago": 204},
+        ])
+        client = ApeWisdomClient()
+
+        with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=self._mock_response(payload))):
+            trending = await client.get_trending("all-crypto")
+
+        assert len(trending) == 1
+        assert trending[0] == {
+            "ticker": "BTC.X", "name": "Bitcoin", "mentions": 136,
+            "mentions_24h_ago": 204, "rank": 1, "rank_24h_ago": 1,
+        }
+
+    @pytest.mark.asyncio
+    async def test_respects_max_results(self):
+        payload = _apewisdom_response([
+            {"rank": i, "ticker": f"T{i}", "name": f"Ticker {i}", "mentions": 10,
+             "mentions_24h_ago": 5, "rank_24h_ago": i}
+            for i in range(1, 11)
+        ])
+        client = ApeWisdomClient()
+
+        with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=self._mock_response(payload))):
+            trending = await client.get_trending("all-stocks", max_results=3)
+
+        assert len(trending) == 3
+
+    @pytest.mark.asyncio
+    async def test_network_error_returns_empty_list(self):
+        client = ApeWisdomClient()
+        with patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("network error"))):
+            trending = await client.get_trending("all-crypto")
+        assert trending == []

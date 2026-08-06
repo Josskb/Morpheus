@@ -34,6 +34,7 @@ from src.collector.config_loader import load_accounts_config
 from src.collector.service import CollectorService
 from src.collector.shortseller_service import ShortSellerService
 from src.collector.stocktwits_client import StockTwitsClient
+from src.collector.trending_service import TrendingService
 from src.collector.yfinance_news_client import YFinanceNewsClient
 from src.core.database import init_db
 from src.core.settings import get_settings
@@ -68,6 +69,7 @@ async def run_all() -> None:
     alerts = AlertService()
     recap = RecapService()
     shortsellers = ShortSellerService()
+    trending = TrendingService()
     ml = MLScoringService()
 
     await scheduler.reload_pending_from_db()
@@ -82,6 +84,7 @@ async def run_all() -> None:
             alerts.run(),
             recap.run(),
             shortsellers.run(),
+            trending.run(),
             ml.run(),
         )
     except KeyboardInterrupt:
@@ -95,6 +98,7 @@ async def run_all() -> None:
         await alerts.stop()
         await recap.stop()
         await shortsellers.stop()
+        await trending.stop()
         ml.stop()
         from src.market.fetcher import get_market_fetcher
         await get_market_fetcher().close()
@@ -187,6 +191,16 @@ async def shortsellers_once() -> None:
     print(f"\nShort-sellers : {sent} alerte(s) envoyée(s).")
 
 
+async def trending_once() -> None:
+    """Vérifie les tickers en tendance (ApeWisdom) puis quitte."""
+    await init_db()
+    svc = TrendingService()
+    await svc._bot.start()
+    sent = await svc.check_once()
+    await svc._bot.stop()
+    print(f"\nTendance : {sent} alerte(s) envoyée(s).")
+
+
 async def ml_once() -> None:
     """Score les tweets ML en attente puis quitte."""
     await init_db()
@@ -220,6 +234,7 @@ def main() -> None:
     parser.add_argument("--alert-once", action="store_true", help="Envoyer les alertes en attente puis quitter")
     parser.add_argument("--recap-once", action="store_true", help="Déclencher les récaps dus puis quitter")
     parser.add_argument("--shortsellers-once", action="store_true", help="Vérifier les rapports short-sellers puis quitter")
+    parser.add_argument("--trending-once", action="store_true", help="Vérifier les tickers en tendance (ApeWisdom) puis quitter")
     parser.add_argument("--ml-once", action="store_true", help="Scorer les tweets ML en attente puis quitter")
     parser.add_argument("--ml-train", action="store_true", help="Entraîner le modèle XGBoost puis quitter")
     parser.add_argument("--poll-stocktwits-once", action="store_true", help="Un seul polling StockTwits puis quitter")
@@ -257,6 +272,10 @@ def main() -> None:
 
     if args.shortsellers_once:
         asyncio.run(shortsellers_once())
+        sys.exit(0)
+
+    if args.trending_once:
+        asyncio.run(trending_once())
         sys.exit(0)
 
     if args.ml_once:

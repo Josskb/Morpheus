@@ -77,6 +77,18 @@ class TelegramBot:
             logger.error("Erreur Telegram : {}", e)
             return False
 
+    async def send_trending_alert(
+        self, ticker: str, name: str, mentions: int, mentions_24h_ago: int, market: str,
+    ) -> bool:
+        """Alerte sur un ticker dont les mentions Reddit/4chan explosent en 24h."""
+        message = (
+            f"🔥 <b>Ticker en tendance</b>\n\n"
+            f"📈 <b>{html.escape(ticker)}</b> ({html.escape(name)}) — {market}\n"
+            f"{mentions} mentions (vs {mentions_24h_ago} il y a 24h)\n\n"
+            f"<i>Morpheus Finance Bot — signal d'attention Reddit/4chan</i>"
+        )
+        return await self.send(message)
+
     async def send_shortseller_alert(
         self, firm: str, emoji: str, title: str, url: str
     ) -> bool:

@@ -409,6 +409,29 @@ class TestTradingViewUrl:
         assert _tradingview_url("ALKAL.PA") is None
 
 
+class TestTelegramBotTrendingAlert:
+    def _make_bot(self):
+        from src.alerts.bot import TelegramBot
+        bot = TelegramBot.__new__(TelegramBot)
+        bot._configured = False
+        bot._bot = None
+        bot.send = AsyncMock(return_value=True)
+        return bot
+
+    @pytest.mark.asyncio
+    async def test_formats_trending_alert(self):
+        bot = self._make_bot()
+        await bot.send_trending_alert(
+            ticker="BTC.X", name="Bitcoin", mentions=136, mentions_24h_ago=34, market="Crypto",
+        )
+        text = bot.send.call_args[0][0]
+        assert "BTC.X" in text
+        assert "Bitcoin" in text
+        assert "136" in text
+        assert "34" in text
+        assert "Crypto" in text
+
+
 class TestTelegramBotShortsellerAlert:
     def _make_bot(self):
         from src.alerts.bot import TelegramBot
