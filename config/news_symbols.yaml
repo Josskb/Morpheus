@@ -1,0 +1,39 @@
+# ══════════════════════════════════════════════════════════════════
+#  news_symbols.yaml — Tickers suivis via les news yfinance
+#  Utile pour les titres internationaux / petites caps peu couverts
+#  par StockTwits. username = ticker yfinance exact.
+# ══════════════════════════════════════════════════════════════════
+
+accounts:
+  - username: "000660.KS"
+    display_name: "SK Hynix"
+    markets: [stocks]
+    tags: [yfinance_news, semiconductor]
+    priority: medium
+    enabled: true
+
+  - username: "ALKAL.PA"
+    display_name: "Kalray"
+    markets: [stocks]
+    tags: [yfinance_news, chips]
+    priority: low
+    enabled: true
+
+  # ── Template pour ajouter un ticker ────────────────────────────
+  # - username: TICKER_YFINANCE           # ex: "000660.KS", "ALKAL.PA"
+  #   display_name: "Nom Affiché"
+  #   markets: [stocks]
+  #   tags: [yfinance_news]
+  #   priority: medium
+  #   enabled: true
+
+polling:
+  interval_seconds: 300
+  tweets_per_account: 20
+  lookback_hours: 48      # News moins fréquentes : fenêtre plus large
+
+filters:
+  exclude_retweets: false
+  exclude_replies: false
+  min_length: 10
+  languages: []            # Pas de filtre langue (titres souvent en anglais)

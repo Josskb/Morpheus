@@ -77,6 +77,19 @@ class TelegramBot:
             logger.error("Erreur Telegram : {}", e)
             return False
 
+    async def send_shortseller_alert(
+        self, firm: str, emoji: str, title: str, url: str
+    ) -> bool:
+        """Alerte immédiate pour un nouveau rapport short-seller."""
+        message = (
+            f"🚨 <b>NOUVEAU RAPPORT SHORT-SELLER</b>\n\n"
+            f"{emoji} <b>{html.escape(firm)}</b>\n"
+            f"📄 {html.escape(title)}\n"
+            f"🔗 {url}\n\n"
+            f"<i>Morpheus Finance Bot</i>"
+        )
+        return await self.send(message)
+
     async def send_digest(self, rows: list[tuple[str, str, float]]) -> bool:
         """
         Envoie un récap groupé de tweets (généralement ceux sous le seuil

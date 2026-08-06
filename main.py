@@ -32,7 +32,9 @@ from src.alerts.recap_service import RecapService
 from src.alerts.service import AlertService
 from src.collector.config_loader import load_accounts_config
 from src.collector.service import CollectorService
+from src.collector.shortseller_service import ShortSellerService
 from src.collector.stocktwits_client import StockTwitsClient
+from src.collector.yfinance_news_client import YFinanceNewsClient
 from src.core.database import init_db
 from src.core.settings import get_settings
 from src.market.snapshot_scheduler import SnapshotScheduler
@@ -47,6 +49,12 @@ def _make_stocktwits_collector() -> CollectorService:
     return CollectorService(client=StockTwitsClient(), config=config)
 
 
+def _make_news_collector() -> CollectorService:
+    """Troisième CollectorService, source news yfinance (tickers hors StockTwits)."""
+    config = load_accounts_config(get_settings().news_symbols_config)
+    return CollectorService(client=YFinanceNewsClient(), config=config)
+
+
 async def run_all() -> None:
     """Lance tous les services en parallèle."""
     await init_db()
@@ -55,9 +63,11 @@ async def run_all() -> None:
     scheduler = SnapshotScheduler()
     collector = CollectorService()
     stocktwits = _make_stocktwits_collector()
+    news = _make_news_collector()
     nlp = NLPProcessorService(scheduler=scheduler)
     alerts = AlertService()
     recap = RecapService()
+    shortsellers = ShortSellerService()
     ml = MLScoringService()
 
     await scheduler.reload_pending_from_db()
@@ -66,10 +76,12 @@ async def run_all() -> None:
         await asyncio.gather(
             collector.run(),
             stocktwits.run(),
+            news.run(),
             scheduler.run(),
             nlp.run(),
             alerts.run(),
             recap.run(),
+            shortsellers.run(),
             ml.run(),
         )
     except KeyboardInterrupt:
@@ -77,10 +89,12 @@ async def run_all() -> None:
     finally:
         collector.stop()
         stocktwits.stop()
+        news.stop()
         scheduler.stop()
         nlp.stop()
         await alerts.stop()
         await recap.stop()
+        await shortsellers.stop()
         ml.stop()
         from src.market.fetcher import get_market_fetcher
         await get_market_fetcher().close()
@@ -117,6 +131,21 @@ async def poll_stocktwits_once() -> None:
     print(f"  TOTAL : {total} messages\n")
 
 
+async def poll_news_once() -> None:
+    """Un seul tour de collecte news yfinance pour tester."""
+    await init_db()
+    collector = _make_news_collector()
+    await collector.sync_accounts_to_db()
+    results = await collector.poll_once()
+    print(f"\n{'='*50}")
+    print("Résultats de la collecte news yfinance :")
+    for symbol, count in results.items():
+        print(f"  {symbol:30s} → {count:3d} nouveaux articles")
+    total = sum(results.values())
+    print(f"{'='*50}")
+    print(f"  TOTAL : {total} articles\n")
+
+
 async def nlp_once() -> None:
     """Traite les tweets en attente de NLP puis quitte."""
     await init_db()
@@ -146,6 +175,16 @@ async def recap_once() -> None:
     await recap._send_daily_recap_if_due()
     await recap._bot.stop()
     print("\nRécap : vérification terminée (voir logs pour le détail).")
+
+
+async def shortsellers_once() -> None:
+    """Vérifie les rapports short-sellers en attente puis quitte."""
+    await init_db()
+    svc = ShortSellerService()
+    await svc._bot.start()
+    sent = await svc.check_once()
+    await svc._bot.stop()
+    print(f"\nShort-sellers : {sent} alerte(s) envoyée(s).")
 
 
 async def ml_once() -> None:
@@ -180,9 +219,11 @@ def main() -> None:
     parser.add_argument("--nlp-once", action="store_true", help="Traiter les tweets NLP en attente puis quitter")
     parser.add_argument("--alert-once", action="store_true", help="Envoyer les alertes en attente puis quitter")
     parser.add_argument("--recap-once", action="store_true", help="Déclencher les récaps dus puis quitter")
+    parser.add_argument("--shortsellers-once", action="store_true", help="Vérifier les rapports short-sellers puis quitter")
     parser.add_argument("--ml-once", action="store_true", help="Scorer les tweets ML en attente puis quitter")
     parser.add_argument("--ml-train", action="store_true", help="Entraîner le modèle XGBoost puis quitter")
     parser.add_argument("--poll-stocktwits-once", action="store_true", help="Un seul polling StockTwits puis quitter")
+    parser.add_argument("--poll-news-once", action="store_true", help="Une seule collecte news yfinance puis quitter")
     args = parser.parse_args()
 
     if args.init_db:
@@ -198,6 +239,10 @@ def main() -> None:
         asyncio.run(poll_stocktwits_once())
         sys.exit(0)
 
+    if args.poll_news_once:
+        asyncio.run(poll_news_once())
+        sys.exit(0)
+
     if args.nlp_once:
         asyncio.run(nlp_once())
         sys.exit(0)
@@ -208,6 +253,10 @@ def main() -> None:
 
     if args.recap_once:
         asyncio.run(recap_once())
+        sys.exit(0)
+
+    if args.shortsellers_once:
+        asyncio.run(shortsellers_once())
         sys.exit(0)
 
     if args.ml_once:

@@ -409,6 +409,29 @@ class TestTradingViewUrl:
         assert _tradingview_url("ALKAL.PA") is None
 
 
+class TestTelegramBotShortsellerAlert:
+    def _make_bot(self):
+        from src.alerts.bot import TelegramBot
+        bot = TelegramBot.__new__(TelegramBot)
+        bot._configured = False
+        bot._bot = None
+        bot.send = AsyncMock(return_value=True)
+        return bot
+
+    @pytest.mark.asyncio
+    async def test_formats_shortseller_alert(self):
+        bot = self._make_bot()
+        await bot.send_shortseller_alert(
+            firm="Grizzly Research", emoji="🐻",
+            title="ACME Corp <fraud>", url="https://grizzlyreports.com/reports/acme",
+        )
+        text = bot.send.call_args[0][0]
+        assert "NOUVEAU RAPPORT SHORT-SELLER" in text
+        assert "Grizzly Research" in text
+        assert "&lt;fraud&gt;" in text  # échappé
+        assert "https://grizzlyreports.com/reports/acme" in text
+
+
 class TestTelegramBotRecap:
     def _make_bot(self):
         from src.alerts.bot import TelegramBot

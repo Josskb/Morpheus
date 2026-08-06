@@ -8,7 +8,7 @@ Utilise MockTwitterClient → pas besoin de credentials.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,6 +25,7 @@ from src.collector.models import (
 from src.collector.service import CollectorService
 from src.collector.stocktwits_client import StockTwitsClient
 from src.collector.twitter_client import MockTwitterClient
+from src.collector.yfinance_news_client import YFinanceNewsClient
 from src.core.database import Account, Tweet
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
@@ -291,3 +292,71 @@ class TestSaveTweetsPersistsHints:
         assert tweet.tickers is None
         assert tweet.sentiment is None
         assert tweet.confidence is None
+
+
+# ── Tests YFinanceNewsClient ────────────────────────────────────────────────────
+
+def _fake_article(
+    uid: str = "abc123",
+    title: str = "SK Hynix beats earnings estimates",
+    publish_time: int | None = None,
+) -> dict:
+    return {
+        "uuid": uid,
+        "title": title,
+        "providerPublishTime": publish_time if publish_time is not None else int(datetime.now(tz=timezone.utc).timestamp()),
+    }
+
+
+class TestYFinanceNewsClient:
+    @pytest.mark.asyncio
+    async def test_parses_articles_into_raw_tweets(self):
+        client = YFinanceNewsClient()
+        mock_ticker = MagicMock()
+        mock_ticker.news = [_fake_article()]
+
+        with patch("src.collector.yfinance_news_client.yf.Ticker", return_value=mock_ticker):
+            tweets = await client.get_recent_tweets("000660.KS", max_results=20)
+
+        assert len(tweets) == 1
+        tweet = tweets[0]
+        assert tweet.tweet_id == "yn_abc123"
+        assert tweet.tickers == ["000660.KS"]
+        assert tweet.sentiment is None
+        assert tweet.confidence is None
+        assert "earnings" in tweet.text
+
+    @pytest.mark.asyncio
+    async def test_skips_articles_without_title(self):
+        client = YFinanceNewsClient()
+        mock_ticker = MagicMock()
+        mock_ticker.news = [{"uuid": "no-title"}]
+
+        with patch("src.collector.yfinance_news_client.yf.Ticker", return_value=mock_ticker):
+            tweets = await client.get_recent_tweets("AAPL")
+
+        assert tweets == []
+
+    @pytest.mark.asyncio
+    async def test_respects_since_cutoff(self):
+        client = YFinanceNewsClient()
+        old_time = int((datetime.now(tz=timezone.utc)).timestamp()) - 3600 * 24 * 3
+        mock_ticker = MagicMock()
+        mock_ticker.news = [_fake_article(uid="old", publish_time=old_time)]
+
+        with patch("src.collector.yfinance_news_client.yf.Ticker", return_value=mock_ticker):
+            tweets = await client.get_recent_tweets("AAPL", since=datetime.now(tz=timezone.utc) - timedelta(hours=1))
+
+        assert tweets == []
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_list_on_error(self):
+        client = YFinanceNewsClient()
+        with patch("src.collector.yfinance_news_client.yf.Ticker", side_effect=Exception("network error")):
+            tweets = await client.get_recent_tweets("AAPL")
+        assert tweets == []
+
+    @pytest.mark.asyncio
+    async def test_resolve_user_id_returns_none(self):
+        client = YFinanceNewsClient()
+        assert await client.resolve_user_id("AAPL") is None

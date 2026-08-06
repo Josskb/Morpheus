@@ -1,0 +1,26 @@
+# ══════════════════════════════════════════════════════════════════
+#  shortsellers.yaml — Cabinets short-sellers activistes surveillés
+#  report_url   : page listant les rapports (souvent la homepage ou /research/)
+#  link_contains: sous-chaîne identifiant un lien de rapport (à affiner
+#                 si faux positifs)
+#
+#  Seuls les sites sans protection anti-bot sont supportés (httpx simple,
+#  pas de navigateur headless) — voir shortseller_client.py.
+# ══════════════════════════════════════════════════════════════════
+
+firms:
+  - name: "Grizzly Research"
+    report_url: "https://grizzlyreports.com"
+    link_contains: "grizzlyreports.com/"
+    emoji: "🐻"
+
+  - name: "Muddy Waters"
+    report_url: "https://muddywatersresearch.com/research/"
+    link_contains: "muddywatersresearch.com/research/"
+    emoji: "💧"
+
+  # ── Template pour ajouter un cabinet ───────────────────────────
+  # - name: "Nom du cabinet"
+  #   report_url: "https://example.com/research/"
+  #   link_contains: "example.com/research/"
+  #   emoji: "🔍"

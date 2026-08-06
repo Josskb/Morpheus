@@ -78,6 +78,14 @@ class Settings(BaseSettings):
         return CONFIG_DIR / "symbols.yaml"
 
     @property
+    def news_symbols_config(self) -> Path:
+        return CONFIG_DIR / "news_symbols.yaml"
+
+    @property
+    def shortsellers_config(self) -> Path:
+        return CONFIG_DIR / "shortsellers.yaml"
+
+    @property
     def markets_config(self) -> Path:
         return CONFIG_DIR / "markets.yaml"
 
