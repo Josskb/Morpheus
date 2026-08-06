@@ -201,6 +201,26 @@ async def trending_once() -> None:
     print(f"\nTendance : {sent} alerte(s) envoyée(s).")
 
 
+async def trending_report() -> None:
+    """Affiche les stats agrégées spike de mentions → mouvement de prix."""
+    await init_db()
+    svc = TrendingService()
+    report = await svc.generate_report()
+
+    if not report:
+        print("\nTendance : pas encore assez de données résolues pour un rapport.")
+        return
+
+    print(f"\n{'='*60}")
+    print("Spike de mentions → mouvement de prix")
+    print(f"{'='*60}")
+    for window, stats in report.items():
+        print(f"\n{window} (n={stats['n']}) : win_rate={stats['win_rate']:.0%}  avg_change={stats['avg_change']:+.2f}%")
+        for market, m_stats in stats["by_market"].items():
+            print(f"    {market:8s} (n={m_stats['n']}) : win_rate={m_stats['win_rate']:.0%}  avg_change={m_stats['avg_change']:+.2f}%")
+    print()
+
+
 async def ml_once() -> None:
     """Score les tweets ML en attente puis quitte."""
     await init_db()
@@ -235,6 +255,7 @@ def main() -> None:
     parser.add_argument("--recap-once", action="store_true", help="Déclencher les récaps dus puis quitter")
     parser.add_argument("--shortsellers-once", action="store_true", help="Vérifier les rapports short-sellers puis quitter")
     parser.add_argument("--trending-once", action="store_true", help="Vérifier les tickers en tendance (ApeWisdom) puis quitter")
+    parser.add_argument("--trending-report", action="store_true", help="Afficher les stats spike de mentions → prix puis quitter")
     parser.add_argument("--ml-once", action="store_true", help="Scorer les tweets ML en attente puis quitter")
     parser.add_argument("--ml-train", action="store_true", help="Entraîner le modèle XGBoost puis quitter")
     parser.add_argument("--poll-stocktwits-once", action="store_true", help="Un seul polling StockTwits puis quitter")
@@ -276,6 +297,10 @@ def main() -> None:
 
     if args.trending_once:
         asyncio.run(trending_once())
+        sys.exit(0)
+
+    if args.trending_report:
+        asyncio.run(trending_report())
         sys.exit(0)
 
     if args.ml_once:

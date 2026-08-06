@@ -16,7 +16,7 @@ asyncpg==0.29.0            # async PostgreSQL (prod-ready swap)
 tweepy==4.14.0
 
 # ── Market Data ────────────────────────────────────────────────────────────────
-yfinance==0.2.40
+yfinance==1.4.0            # 0.2.40 cassait fast_info/history sur pas mal de tickers
 ccxt==4.3.25
 pandas==2.2.2
 numpy==1.26.4

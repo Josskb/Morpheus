@@ -279,3 +279,48 @@ class Prediction(Base):
     )
 
     tweet: Mapped["Tweet"] = relationship(back_populates="predictions")
+
+
+class TrendingSnapshot(Base):
+    """
+    Prix d'un ticker au moment d'un spike de mentions ApeWisdom (Reddit/4chan)
+    + snapshots futurs. Permet de mesurer si un spike d'attention est
+    effectivement suivi d'un mouvement de prix — pas lié à un Tweet
+    (TrendingService ne passe pas par le pipeline RawTweet/NLP), d'où une
+    table dédiée plutôt qu'une réutilisation de MarketSnapshot.
+    """
+    __tablename__ = "trending_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker: Mapped[str] = mapped_column(String(20), nullable=False)
+    market_type: Mapped[str] = mapped_column(String(10))        # crypto | stock
+
+    mentions_at_detection: Mapped[int] = mapped_column(Integer)
+    mentions_24h_ago_at_detection: Mapped[int] = mapped_column(Integer)
+    detected_at: Mapped[datetime] = mapped_column(AwareDateTime(), nullable=False)
+
+    # Prix au moment de la détection (t=0)
+    price_at_detection: Mapped[float | None] = mapped_column(Float)
+
+    # Snapshots futurs (remplis progressivement par TrendingService)
+    price_1h: Mapped[float | None] = mapped_column(Float)
+    price_4h: Mapped[float | None] = mapped_column(Float)
+    price_24h: Mapped[float | None] = mapped_column(Float)
+    price_7d: Mapped[float | None] = mapped_column(Float)
+
+    # Variations calculées (%)
+    change_1h: Mapped[float | None] = mapped_column(Float)
+    change_4h: Mapped[float | None] = mapped_column(Float)
+    change_24h: Mapped[float | None] = mapped_column(Float)
+    change_7d: Mapped[float | None] = mapped_column(Float)
+
+    created_at: Mapped[datetime] = mapped_column(
+        AwareDateTime(), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_trending_ticker_detected", "ticker", "detected_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<TrendingSnapshot {self.ticker} @{self.detected_at}>"

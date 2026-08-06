@@ -39,6 +39,7 @@ async def test_db(tmp_path, monkeypatch):
     import src.alerts.recap_service as recap_mod
     import src.alerts.service as alert_mod
     import src.collector.service as svc_mod
+    import src.collector.trending_service as trending_mod
     import src.market.snapshot_scheduler as sched_mod
     import src.ml.labeler as ml_labeler_mod
     import src.ml.service as ml_mod
@@ -51,6 +52,7 @@ async def test_db(tmp_path, monkeypatch):
     monkeypatch.setattr(sched_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(alert_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(recap_mod, "AsyncSessionLocal", TestSession)
+    monkeypatch.setattr(trending_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(ml_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(ml_labeler_mod, "AsyncSessionLocal", TestSession)
     monkeypatch.setattr(ml_trainer_mod, "AsyncSessionLocal", TestSession)

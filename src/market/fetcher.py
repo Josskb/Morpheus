@@ -63,8 +63,12 @@ class StockFetcher:
                 return float(price)
         except Exception:
             pass
-        # Fallback : dernier close
-        hist = t.history(period="1d", interval="1m")
+        # Fallback : dernier close. Sans `interval` explicite (défaut : barres
+        # quotidiennes) — `interval="1m"` renvoyait un historique vide pour de
+        # nombreux tickers (yfinance restreint la donnée intraday minute),
+        # ce qui faisait échouer silencieusement _fetch_price partout où
+        # fast_info n'a pas de prix (ex: hors heures de marché).
+        hist = t.history(period="1d")
         if not hist.empty:
             return float(hist["Close"].iloc[-1])
         return None
